@@ -1,0 +1,19 @@
+Package: SeasonalUpdate
+Title: DB Update
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Frank",
+           family = "F",
+           role = c("aut", "cre"),
+           email = "frankfredj@example.com",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Updates the player stats database.
+License: none
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports: 
+    stringr,
+    data.table,
+    dplyr
