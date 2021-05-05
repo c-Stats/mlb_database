@@ -1,4 +1,11 @@
+#' Updating the score and player data
+#'
+#' This function updates the score and player statistics R databases.
+#'
+#' @param path the path used by the webscrapper to store data
+#' @return NULL
 #' @export
+
 update_database <- function(path){
 
 	################################################
@@ -37,7 +44,7 @@ update_database <- function(path){
 	 		season <- as.data.frame(as.numeric(season))
 	 		colnames(season) <- "Season"
 
-	 		data[[length(data)]] <- cbind(data[[length(data)]], as.data.table(season))
+	 		data[[length(data)]] <- cbind(data[[length(data)]], data.table::as.data.table(season))
 
 	 		#Order dataframe
 	 		data[[length(data)]] <- data[[length(data)]][order(Season, Team, Date)]
@@ -117,31 +124,6 @@ update_database <- function(path){
 							pitch = data.table::fread(paste(path, "/MLB_Modeling/Betting/Predicted_Lineups/LotoQc_Pitchers_Clean.csv", sep = "")))
 
 
-	#Frame to retrieve the IDs
-	dummy <- scores[, c("Date", "ID", "Team_Home"), with = FALSE]
-	names(dummy)[3] <- "Team_Away"
-	dummy <- rbind(dummy, scores[, c("Date", "ID", "Team_Away"), with = FALSE])
-	names(dummy)[3] <- "Team"
-
-	#Remove double-day matches
-	dummy <- unique(dummy, by=c("Date", "Team"))
-	data.table::setkeyv(dummy, c("Date", "Team"))
-	data.table::setkey(data$Scores, "ID")
-
-	for(i in 1:length(more_lineups)){
-
-		more_lineups[[i]][, ID := NULL]
-		data.table::setkeyv(more_lineups[[i]], c("Date", "Team"))
-		more_lineups[[i]] <- more_lineups[[i]][dummy, nomatch = 0]
-
-		data.table::setkey(more_lineups[[i]], "ID")
-		more_lineups[[i]] <- more_lineups[[i]][data$Scores, nomatch = 0]
-
-		more_lineups[[i]] <- more_lineups[[i]][!(ID %in% data[[i + 1]]$ID)]
-
-	}
-
-	#....
 
 	################################################
 	################################################
@@ -230,14 +212,14 @@ update_database <- function(path){
 	}
 
 
-	processed_frames <- bind_rows(processed_frames)
+	processed_frames <- dplyr::bind_rows(processed_frames)
 	processed_frames <- processed_frames[order(Date, Team)]
-	processed_frames <- as.data.table(processed_frames)
+	processed_frames <- data.table::as.data.table(processed_frames)
 
 	rankings <- as.data.frame(matrix(nrow = n_dates * n_teams, ncol = 7))
 	colnames(rankings) <- c("Date", "Team", "Win_p", "PPG", "PPG_vs", "PPG_diff", "Streak")
 	rankings[1, ] <- processed_frames[1, colnames(rankings), with = FALSE]
-	rankings <- as.data.table(rankings)
+	rankings <- data.table::as.data.table(rankings)
 
 	srt <- c("Team", "Win_p", "PPG", "PPG_vs", "PPG_diff", "Streak")
 	decr <- c("Win_p", "PPG", "PPG_diff", "Streak")
@@ -264,14 +246,14 @@ update_database <- function(path){
 		index <- c(frm:to)[match(subframe$Team, teams)]
 		fill <- c(frm:to)[-match(subframe$Team, teams)]
 
-		set(rankings, i = c(frm:to), j = match("Team", colnames(rankings)), value = teams)
-		set(rankings, i = c(frm:to), j = match("Date", colnames(rankings)), value = dates[i])
+		data.table::set(rankings, i = c(frm:to), j = match("Team", colnames(rankings)), value = teams)
+		data.table::set(rankings, i = c(frm:to), j = match("Date", colnames(rankings)), value = dates[i])
 
-		set(rankings, i = index, j = match(paste, colnames(rankings)), value = subframe[, paste, with = FALSE])
+		data.table::set(rankings, i = index, j = match(paste, colnames(rankings)), value = subframe[, paste, with = FALSE])
 
 		if(length(fill) > 0){
 
-			set(rankings, i = fill, j = match(paste, colnames(rankings)), value = 0)
+			data.table::set(rankings, i = fill, j = match(paste, colnames(rankings)), value = 0)
 
 		}
 
@@ -297,7 +279,6 @@ update_database <- function(path){
 	seasons <- sort(unlist(unique(data$Scores[, (Season)])))
 	teams <- sort(unlist(unique(data$Scores[, (Team_Home)])))
 
-	if(update){seasons <- max(seasons)}
 
 	for(i in 2:length(data)){
 

@@ -1,19 +1,20 @@
-Package: SeasonalUpdate
-Title: DB Update
+Package: mlbDatabase
+Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "Frank",
-           family = "F",
+    person(given = "First",
+           family = "Last",
            role = c("aut", "cre"),
-           email = "frankfredj@example.com",
+           email = "first.last@example.com",
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: Updates the player stats database.
-License: none
+Description: What the package does (one paragraph).
+License: `use_mit_license()`, `use_gpl3_license()` or friends to
+    pick a license
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Imports: 
-    stringr,
+    dplyr,
     data.table,
-    dplyr
+    stringr
