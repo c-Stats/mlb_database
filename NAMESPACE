@@ -2,5 +2,7 @@
 
 export(query_stats)
 export(update_database)
+export(update_design_matrix)
 import(data.table)
+import(dplyr)
 import(magrittr)

@@ -19,9 +19,6 @@
 #'
 query_stats <- function(date, lineup, params, id = NULL){
 
-	`%>%` <- magrittr::`%>%`
-	`:=` <- data.table::`:=`
-
 	#Construct the lineup if an ID is provided instead of a lineup
 	if(!is.null(id)){
 
