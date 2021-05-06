@@ -2,5 +2,5 @@
 
 export(query_stats)
 export(update_database)
-importFrom(data.table,":=")
-importFrom(magrittr,"%>%")
+import(data.table)
+import(magrittr)

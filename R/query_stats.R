@@ -13,8 +13,9 @@
 #' @param id the match ID. Defaults to NULL; if specified, the lineup will be retrieved from historical files. (I.e.: use IDs to build a design matrix X post-webscrapping.)
 #' @return A single row of the design matrix X given two teams and two rosters.
 #' @export
-#' @importFrom data.table ":="
-#' @importFrom magrittr "%>%"
+#' @import data.table 
+#' @import magrittr 
+#' @import dplyr
 #'
 query_stats <- function(date, lineup, params, id = NULL){
 
