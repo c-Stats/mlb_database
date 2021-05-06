@@ -5,8 +5,11 @@
 #' @param path the path used by the webscrapper to store data
 #' @return NULL
 #' @export
-
+#' @importFrom data.table ":="
+#' @importFrom magrittr "%>%"
+#'
 update_database <- function(path){
+
 
 	################################################
 	################ INITIALISATION ################
@@ -606,3 +609,7 @@ update_database <- function(path){
 	################################################
 		
 }
+
+
+
+
