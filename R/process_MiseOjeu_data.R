@@ -12,7 +12,6 @@
 #'
 
 
-
 process_MiseOjeu_data <- function(path){
 
 	#################################################################################################
@@ -73,25 +72,10 @@ process_MiseOjeu_data <- function(path){
 
 		bets[[length(bets)]][, Scrapping_Time := as.POSIXct(Scrapping_Time)]
 		bets[[length(bets)]][, Game_Time := as.POSIXct(Game_Time)]
-		bets[[length(bets)]][, Date := as.Date(Game_Time)]
+		bets[[length(bets)]][, Date := as.Date(stringr::str_split(Game_Time, " ", simplify = TRUE)[, 1])]
 
 
-		bets[[length(bets)]][, Minutes_Until_Start := lapply(.SD, function(x){
-
-																	x <- stringr::str_split(x, "days ", simplify = TRUE)[, 2]
-																	x <- sapply(x, function(a){
-
-																		a <- stringr::str_split(a, ":")[[1]]
-																		return(60*as.integer(a[1]) + as.integer(a[2]))
-
-																								}
-																				)
-
-																	return(x)
-
-																			}
-											),
-											.SDcols = "Game_Starts_In"]
+		bets[[length(bets)]][, Minutes_Until_Start := Game_Time - Scrapping_Time]
 
 		#Remove games taking place tomorrow rather than today
 		bets[[length(bets)]] <- bets[[length(bets)]][Minutes_Until_Start <= 12 * 60]
@@ -209,7 +193,7 @@ process_MiseOjeu_data <- function(path){
 	index <- which(grepl("PAIR/IMPAIR", bets_by_cat$TOTAL$Bet_Type))
 	rmv <- c()
 	#After n innings
-	string_name <- "MANCHES"
+	string_name <- "PREMIERES MANCHES"
 	n_innings <- c(3, 5, 7)
 
 	for(n in n_innings){

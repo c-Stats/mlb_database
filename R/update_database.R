@@ -556,7 +556,7 @@ update_database <- function(path){
 	scores[missing_val_index_LotoQc, Factor_Away_LotoQc_Approx := Factor_Away_Historical + Profit_Margin_Historical - mean_LotoQc_profit_margin]
 	scores[missing_val_index_LotoQc, Profit_Margin_LotoQc_Approx := mean_LotoQc_profit_margin]
 
-	scores[, P_Home_Win_LotoQc_Approx := 1 / (Factor_Away_LotoQc_Approx + Profit_Margin_LotoQc_Approx)]
+	scores[, P_Home_Win_LotoQc_Approx := 1 / (Factor_Home_LotoQc_Approx + Profit_Margin_LotoQc_Approx)]
 
 	#Tag matches with avaible moneylines data
 	scores[, Avaible_for_Betting := scores$Avaible_for_Regr & !is.na(scores$P_Home_Win_LotoQc_Approx)]
