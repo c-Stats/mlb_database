@@ -3,26 +3,28 @@
 #' This function updates the design matrix, the score and the bookmakers data needed for regression purposes
 #'
 #'
-#' @param path the path used by the webscrapper to save data
-#' @param version a tag used to save file (i.e.: to distinguish between different time windows used to compute averages)
+#' @param scrapper_path the path used by the webscrapper to save data
+#' @param avg_number a tag used to save file (i.e.: to distinguish between different time windows used to compute averages)
 #' @return NULL
 #' @export
 #' @import data.table 
 #' @import magrittr 
 #' @import dplyr
 #'
-update_design_matrix <- function(path, version){
+update_design_matrix <- function(scrapper_path, avg_number, params = list(n_season = 2,
+																			n_match_bat = 120,
+																			n_match_pitch = 120)){
 
-	n <- version
+	n <- avg_number
 
 	################################################
 	########### Load database       ################
 	################################################
 
-	load_path <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Seasonal_Database.rds", sep = "")
+	load_path <- paste(scrapper_path, "/MLB_Modeling/Scores/Clean_Data/Seasonal_Database.rds", sep = "")
 	DB <- readRDS(load_path)
 
-	load_path <- paste(path, "/MLB_Modeling/Scores/Clean_Data/DB_Scores.rds", sep = "")
+	load_path <- paste(scrapper_path, "/MLB_Modeling/Scores/Clean_Data/DB_Scores.rds", sep = "")
 	scores <- readRDS(load_path)
 
 	################################################
@@ -34,22 +36,23 @@ update_design_matrix <- function(path, version){
 	################################################
 
 	#Check if frame needs to be created, or updated
-	dir <- paste(path, "/MLB_Modeling/Regression/", n, sep = "")
-	if(!dir.exists(dir)){
+	directory <- paste(scrapper_path, "/MLB_Modeling/Regression/", n, sep = "")
+	if(!dir.exists(directory)){
 
-		dir.create(dir)
+		dir.create(directory)
 
 	}
 
-	path_save <- paste(dir, "/R_regression_matrix.rds", sep = "")
+	path_save <- paste(directory, "/R_regression_matrix.rds", sep = "")
 	if(file.exists(path_save)){
 
 		update <- TRUE
 
 		existing_data <- readRDS(path_save)
 		ID_done <- existing_data$Y$ID
-		scores <- scores[!(ID %in% ID_done)]
-		scores <- scores[Date > max(existing_data$Y$Date)]
+		data.table::setkey(scores, "ID")
+		scores <- scores[-scores[ID_done, which = TRUE]]
+		scores <- scores[Date >= max(existing_data$Y$Date)]
 
 		print("Existing design matrix found; updating database...", quote = FALSE)
 
@@ -61,7 +64,6 @@ update_design_matrix <- function(path, version){
 	}
 
 	#Weed-out unusable data
-	scores <- scores[Avaible_for_Betting == TRUE]
 	scores[, Missing_Data := FALSE]
 
 	if(nrow(scores) == 0){
@@ -71,37 +73,37 @@ update_design_matrix <- function(path, version){
 
 	}
 
-	sample_row <- query_stats(date = NULL, lineup = NULL, params = params, id = as.numeric(scores$ID[1]))
+	sample_row <- mlbDatabase::query_stats(date = NULL, lineup = NULL, params = params, id = as.numeric(scores$ID[1]))
 	ncols <- ncol(sample_row)
 	nrows <- nrow(scores)
 
 	X <- matrix(0.0, nrows, ncols)
 	colnames(X) <- colnames(sample_row)
-	X <- as.data.table(X)
+	X <- data.table::as.data.table(X)
 	sd_col <- c(1:ncol(X))
 
 	print(paste(nrow(X), "matches are to be processed."), quote = FALSE)
 
-	setkey(scores, "ID")
+	data.table::setkey(scores, "ID")
 	pb <- txtProgressBar(min = 0, max = nrow(X), style = 3)
 	n_miss <- 0
 	for(i in 1:nrow(X)){
 
-		row_val <- try(query_stats(date = NULL, lineup = NULL, params = params, id = scores$ID[i]), silent = TRUE)
+		row_val <- try(mlbDatabase::query_stats(date = NULL, lineup = NULL, params = params, id = scores$ID[i]), silent = TRUE)
 		if(class(row_val)[1] == "try-error"){
 
 			print("Lineup not found.", quote = FALSE)
-			set(X, i = as.integer(i), j = sd_col, value = NA)
+			data.table::set(X, i = as.integer(i), j = sd_col, value = NA)
 
 		} else {
 
 			if(nrow(row_val) == 0){
 
-				set(X, i = as.integer(i), j = sd_col, value = NA)
+				data.table::set(X, i = as.integer(i), j = sd_col, value = NA)
 
 			} else {
 
-				set(X, i = as.integer(i), j = sd_col, value = row_val[1])
+				data.table::set(X, i = as.integer(i), j = sd_col, value = row_val[1])
 
 			}
 
@@ -160,14 +162,14 @@ update_design_matrix <- function(path, version){
 	########### SAVE                ################
 	################################################
 
-	dir <- paste(path, "/MLB_Modeling/Regression/", n, sep = "")
-	if(!dir.exists(dir)){
+	directory <- paste(scrapper_path, "/MLB_Modeling/Regression/", n, sep = "")
+	if(!dir.exists(directory)){
 
-		dir.create(dir)
+		dir.create(directory)
 
 	}
 
-	path_save <- paste(dir, "/R_regression_matrix.rds", sep = "")
+	path_save <- paste(directory, "/R_regression_matrix.rds", sep = "")
 	saveRDS(list(X = X, 
 					Y = scores),
 					path_save)

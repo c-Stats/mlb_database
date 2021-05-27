@@ -52,8 +52,6 @@ process_MiseOjeu_data <- function(path){
 
 
 	bets <- list()
-	pb <- txtProgressBar(min = 0, max = length(folders) - length(dates_done), style = 3)
-	i <- 0
 	print("Extracting data...", quote = FALSE)
 	for(f_path in folders){
 
@@ -75,7 +73,7 @@ process_MiseOjeu_data <- function(path){
 		bets[[length(bets)]][, Date := as.Date(stringr::str_split(Game_Time, " ", simplify = TRUE)[, 1])]
 
 
-		bets[[length(bets)]][, Minutes_Until_Start := Game_Time - Scrapping_Time]
+		bets[[length(bets)]][, Minutes_Until_Start := (Game_Time - Scrapping_Time)/60]
 
 		#Remove games taking place tomorrow rather than today
 		bets[[length(bets)]] <- bets[[length(bets)]][Minutes_Until_Start <= 12 * 60]
@@ -94,8 +92,6 @@ process_MiseOjeu_data <- function(path){
 		bets[[length(bets)]][, Game_Starts_In := NULL]
 		bets[[length(bets)]][, Game_Started := NULL]
 
-		i <- i + 1
-		setTxtProgressBar(pb, i)
 
 	}
 
@@ -298,11 +294,16 @@ process_MiseOjeu_data <- function(path){
 	#Else update
 	} else {
 
-		for(i in 1:length(temp)){
+		for(i in 1:length(bets_DB)){
 
-			for(j in 1:length(temp[[i]])){
+			a <- names(bets_DB[[i]][[j]])
+			b <- names(temp[[i]][[j]])
 
-				temp[[i]][[j]] <- rbind(temp[[i]][[j]][Date < today], bets_DB[[i]][[j]])
+			indices <- match(a, b)
+
+			for(j in 1:length(indices)){
+
+				temp[[i]][[indices[j]]] <- rbind(temp[[i]][[indices[j]]][Date < today], bets_DB[[i]][[j]])
 
 			}
 

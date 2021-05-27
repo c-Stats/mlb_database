@@ -4,12 +4,16 @@
 \alias{update_design_matrix}
 \title{Update the regression data}
 \usage{
-update_design_matrix(path, version)
+update_design_matrix(
+  scrapper_path,
+  avg_number,
+  params = list(n_season = 2, n_match_bat = 120, n_match_pitch = 120)
+)
 }
 \arguments{
-\item{path}{the path used by the webscrapper to save data}
+\item{scrapper_path}{the path used by the webscrapper to save data}
 
-\item{version}{a tag used to save file (i.e.: to distinguish between different time windows used to compute averages)}
+\item{avg_number}{a tag used to save file (i.e.: to distinguish between different time windows used to compute averages)}
 }
 \description{
 This function updates the design matrix, the score and the bookmakers data needed for regression purposes

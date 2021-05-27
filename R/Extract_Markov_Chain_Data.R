@@ -95,8 +95,8 @@ Extract_Markov_Chain_Data <- function(date, lineup, params, id = NULL){
 		out <- list()
 		for(j in 1:2){
 
-			out[[j]] <- matrix(0, nrow = nrow(states), ncol = nrow(states))
-			rownames(out[[j]]) <- paste(paste(states$Base, states$Outs, sep = " ; "), "Out")
+			out[[j]] <- matrix(0, nrow = nrow(play_by_play$states), ncol = nrow(play_by_play$states))
+			rownames(out[[j]]) <- paste(paste(play_by_play$states$Base, play_by_play$states$Outs, sep = " ; "), "Out")
 			colnames(out[[j]]) <- rownames(out[[j]])
 
 		}
@@ -142,6 +142,8 @@ Extract_Markov_Chain_Data <- function(date, lineup, params, id = NULL){
 
 		data.table::setorderv(out$batting_order, c("Inn.", "Move_n", "Batting_Order"))	
 
+		out$batters_faced <- unique(data[, c("ID", "Batters_Faced"), with = FALSE])
+
 		return(out)
 
 	}
@@ -154,10 +156,13 @@ Extract_Markov_Chain_Data <- function(date, lineup, params, id = NULL){
 		frames <- list(bat = list(),
 						pitch = list())
 
+		b_names <- sapply(lineup[[k]]$bat, function(x){substr(x, 1, nchar(x) - 3)})
+		p_names <- sapply(lineup[[k]]$pitch, function(x){substr(x, 1, nchar(x) - 3)})
+
 		for(s in seasons){
 
-			frames$bat[[length(frames$bat) + 1]] <- play_by_play[[s]][Batter_Name %in% lineup[[k]]$bat]
-			frames$pitch[[length(frames$pitch) + 1]] <- play_by_play[[s]][Pitcher_Name %in% lineup[[k]]$pitch]
+			frames$bat[[length(frames$bat) + 1]] <- play_by_play[[s]][Batter_Name2 %in% b_names]
+			frames$pitch[[length(frames$pitch) + 1]] <- play_by_play[[s]][Pitcher_Name2 %in% p_names]
 
 		}
 
@@ -180,15 +185,15 @@ Extract_Markov_Chain_Data <- function(date, lineup, params, id = NULL){
 		event_matrices <- list(bat = list(),
 								pitch = list())
 
-		for(b in lineup[[k]]$bat){
+		for(b in b_names){
 
 			if(k == 1){
 
-				temp <- frames$bat[Batter_Name == b & Team_Home == Team_Bat]
+				temp <- frames$bat[Batter_Name2 == b & Team_Home == Team_Bat]
 
 			} else {
 
-				temp <- frames$bat[Batter_Name == b & Team_Away == Team_Bat]
+				temp <- frames$bat[Batter_Name2 == b & Team_Away == Team_Bat]
 
 			}
 			
@@ -240,15 +245,15 @@ Extract_Markov_Chain_Data <- function(date, lineup, params, id = NULL){
 		names(event_matrices$bat) <- lineup[[k]]$bat
 
 
-		for(b in lineup[[k]]$pitch){
+		for(b in p_names){
 
 			if(k == 1){
 
-				temp <- frames$pitch[Pitcher_Name == b & Team_Home == Team_Pitch]
+				temp <- frames$pitch[Pitcher_Name2 == b & Team_Home == Team_Pitch]
 
 			} else {
 
-				temp <- frames$pitch[Pitcher_Name == b & Team_Away == Team_Pitch]
+				temp <- frames$pitch[Pitcher_Name2 == b & Team_Away == Team_Pitch]
 
 			}
 			

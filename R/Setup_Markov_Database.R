@@ -22,9 +22,13 @@ Setup_Markov_Database <- function(path){
 
 		print("File missing at:", quote = FALSE)
 		print(pbp_path, quote = FALSE)
+		return(NULL)
 
 	}
 
+
+	f <- function(x){sapply(x, function(y){substr(y, nchar(y)-2, nchar(y))})}
+	play_by_play[[1]][, Batter_Name2 := f(Batter_Name)]
 
 
 	#Extract state transitions
@@ -274,10 +278,54 @@ Setup_Markov_Database <- function(path){
 												by = c("ID", "Inn.", "Team_Bat", "Batter_Name"),
 												.SDcol = "Batting_Order"]
 
-	save_path <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Markov_Database.rds", sep = "")
-	saveRDS(play_by_play, save_path)											
+
+		play_by_play[[i]][, Batter_Name2 := lapply(.SD, function(x){
+
+						to <- nchar(x[1]) - 3 
+						x[] <- substr(x[1], 1, to)	
+						return(x)		
+
+																}),
+						by = c("Batter_Name"),
+						.SDcol = "Batter_Name"]											
+
+		play_by_play[[i]][, Pitcher_Name2 := lapply(.SD, function(x){
+
+						to <- nchar(x[1]) - 3 
+						x[] <- substr(x[1], 1, to)	
+						return(x)		
+
+																}),
+						by = c("Pitcher_Name"),
+						.SDcol = "Pitcher_Name"]											
 
 	}
+
+
+	seasons <- names(play_by_play)
+	for(s in seasons){
+
+		data.table::setkeyv(play_by_play[[s]], c("ID", "Pitcher_Name"))
+
+		teams <- unique(play_by_play[[s]]$Team_Away)
+		for(t in teams){
+
+			swap <- which(names(DB[[s]][[t]]$Pitch) == "Name")
+			names(DB[[s]][[t]]$Pitch)[swap] <- "Pitcher_Name"
+
+			data.table::setkeyv(DB[[s]][[t]]$Pitch, c("ID", "Pitcher_Name"))
+
+			play_by_play[[s]][DB[[s]][[t]]$Pitch, Batters_Faced := i.TBF]
+
+		}
+
+	}
+
+
+	play_by_play$states <- states
+
+	save_path <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Markov_Database.rds", sep = "")
+	saveRDS(play_by_play, save_path)	
 
 }
 
