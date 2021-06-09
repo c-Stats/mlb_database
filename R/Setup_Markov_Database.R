@@ -196,12 +196,13 @@ Setup_Markov_Database <- function(path){
 		play_by_play[[i]][scores, Factor_home := i.Factor_Home_Historical]
 		play_by_play[[i]][scores, Factor_away := i.Factor_Away_Historical]
 		play_by_play[[i]][scores, P_Home_Win := i.P_Home_Win_Historical]
+		play_by_play[[i]][scores, P_Estim := i.P_Estim]
 
 	}
 
 
 
-	unique_transitions <- dplyr::bind_rows(play_by_play)
+	unique_transitions <- data.table::copy(dplyr::bind_rows(play_by_play))
 
 	unique_transitions[, P_points := lapply(.SD, function(x){
 
@@ -233,7 +234,7 @@ Setup_Markov_Database <- function(path){
 					to = states[, c("Next_base", "Next_out", "Avg_Points"), with = FALSE])
 	for(i in 1:2){names(states2[[i]])[1:2] <- c("Base", "Outs")}
 
-	states <- dplyr::bind_rows(states2)
+	states <- data.table::copy(dplyr::bind_rows(states2))
 	states2 <- NULL
 	states <- unique(states[, c("Base", "Outs"), with = FALSE])
 
@@ -316,6 +317,26 @@ Setup_Markov_Database <- function(path){
 			data.table::setkeyv(DB[[s]][[t]]$Pitch, c("ID", "Pitcher_Name"))
 
 			play_by_play[[s]][DB[[s]][[t]]$Pitch, Batters_Faced := i.TBF]
+			play_by_play[[s]][DB[[s]][[t]]$Pitch, Pitcher_Announced := i.Announced]
+
+		}
+
+	}
+
+
+	for(s in seasons){
+
+		data.table::setkeyv(play_by_play[[s]], c("ID", "Batter_Name"))
+
+		teams <- unique(play_by_play[[s]]$Team_Away)
+		for(t in teams){
+
+			swap <- which(names(DB[[s]][[t]]$Bat) == "Name")
+			names(DB[[s]][[t]]$Bat)[swap] <- "Batter_Name"
+
+			data.table::setkeyv(DB[[s]][[t]]$Bat, c("ID", "Batter_Name"))
+
+			play_by_play[[s]][DB[[s]][[t]]$Bat, Batter_Announced := i.Announced]
 
 		}
 
@@ -323,6 +344,8 @@ Setup_Markov_Database <- function(path){
 
 
 	play_by_play$states <- states
+	play_by_play$states[, On_Base := lapply(.SD, function(x){3 - stringr::str_count(x, "_")}), .SDcol = "Base"]
+	play_by_play$states[Base == "End", On_Base := NA]
 
 	save_path <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Markov_Database.rds", sep = "")
 	saveRDS(play_by_play, save_path)	

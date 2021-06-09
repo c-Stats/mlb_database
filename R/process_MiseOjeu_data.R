@@ -78,20 +78,24 @@ process_MiseOjeu_data <- function(path){
 		#Remove games taking place tomorrow rather than today
 		bets[[length(bets)]] <- bets[[length(bets)]][Minutes_Until_Start <= 12 * 60]
 
-
 		#Retain the most recently scrapped values for each pair of teams
-		combinations <- unique(bets[[length(bets)]][, c("Team_Home", "Team_Away", "Scrapping_Time"), with = FALSE])
-		combinations <- combinations[Team_Home != "" & Team_Away != ""]
+		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
+								by = c("Team_Home", "Team_Away"),
+								.SDcols = "Minutes_Until_Start"]
 
-		combinations <- combinations[, lapply(.SD, max), by = c("Team_Home", "Team_Away"), .SDcols = "Scrapping_Time"]
+		bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
 
-		data.table::setkeyv(bets[[length(bets)]], c("Team_Home", "Team_Away", "Scrapping_Time"))
-		data.table::setkeyv(combinations, c("Team_Home", "Team_Away", "Scrapping_Time"))
-
-		bets[[length(bets)]] <- bets[[length(bets)]][combinations]
+		bets[[length(bets)]][, Most_Recent := NULL]
 		bets[[length(bets)]][, Game_Starts_In := NULL]
 		bets[[length(bets)]][, Game_Started := NULL]
 
+
+	}
+
+	if(length(bets) == 0){
+
+		print("No new matches to process.", quote = FALSE)
+		return(NULL)
 
 	}
 
@@ -158,6 +162,14 @@ process_MiseOjeu_data <- function(path){
 	}
 
 
+	for(i in 1:length(bets_DB$GAGNANT)){
+
+		bets_DB$GAGNANT[[i]][Bet_On2 == "None" & Team_Home == "PHI", Bet_On2 := "Home"]
+		bets_DB$GAGNANT[[i]][Bet_On2 == "None" & Team_Away == "PHI", Bet_On2 := "Away"]
+
+	}
+
+
 	#-------------------------------------------------
 	#-------------------------------------------------
 	bets_DB$ECART <- list()
@@ -178,6 +190,14 @@ process_MiseOjeu_data <- function(path){
 	names(bets_DB$ECART) <- paste(n_innings, string_name)
 
 	bets_DB$ECART$MATCH <- bets_by_cat$ECART[, names(bets_by_cat$ECART), with = FALSE]
+
+
+	for(i in 1:length(bets_DB$ECART)){
+
+		bets_DB$ECART[[i]][Bet_On2 == "None" & Team_Home == "PHI", Bet_On2 := "Home"]
+		bets_DB$ECART[[i]][Bet_On2 == "None" & Team_Away == "PHI", Bet_On2 := "Away"]
+
+	}
 
 
 	#-------------------------------------------------
@@ -257,6 +277,20 @@ process_MiseOjeu_data <- function(path){
 	bets_DB$TOTAL$"SINGLE TEAM MATCH" <- bets_by_cat$TOTAL[, names(bets_by_cat$TOTAL), with = FALSE]
 
 
+	for(i in 1:length(bets_DB$TOTAL)){
+
+		if(grepl("SINGLE", names(bets_DB$TOTAL)[i], fixed = TRUE)){
+
+			bets_DB$TOTAL[[i]][Bet_On2 == "None" & Team_Home == "PHI", Bet_On2 := "Home"]
+			bets_DB$TOTAL[[i]][Bet_On2 == "None" & Team_Away == "PHI", Bet_On2 := "Away"]
+
+		}
+
+
+	}
+
+
+
 	#-------------------------------------------------
 	#-------------------------------------------------
 	bets_DB$MARGE <- list()
@@ -279,10 +313,121 @@ process_MiseOjeu_data <- function(path){
 
 	bets_DB$MARGE$MATCH <- bets_by_cat$MARGE[, names(bets_by_cat$MARGE), with = FALSE]
 
+	for(i in 1:length(bets_DB$MARGE)){
+
+		bets_DB$MARGE[[i]][Bet_On2 == "None" & Team_Home == "PHI" & Bet_On != "Nul", Bet_On2 := "Home"]
+		bets_DB$MARGE[[i]][Bet_On2 == "None" & Team_Away == "PHI" & Bet_On != "Nul", Bet_On2 := "Away"]
+
+	}
+
+
 
 	#-------------------------------------------------
 	#-------------------------------------------------
-	bets_DB$"PREMIER ARRIVE" <- list(PREMIER = bets_by_cat$`PREMIER ARRIVE`[Bet_On2 != "None"])
+	bets_DB$"PREMIER ARRIVE" <- list(PREMIER = bets_by_cat$`PREMIER ARRIVE`)
+	bets_DB$"PREMIER ARRIVE"$PREMIER[Bet_On2 == "None" & Team_Home == "PHI" & Bet_On != "Aucun e", Bet_On2 := "Home"]
+	bets_DB$"PREMIER ARRIVE"$PREMIER[Bet_On2 == "None" & Team_Home == "PHI" & Bet_On != "Aucun e", Bet_On2 := "Away"]
+
+
+	#-------------------------------------------------
+	#-------------------------------------------------
+	#Combine everything into one frame
+
+	#-------------------------------------------------
+	#GAGNANT
+	innings <- c(100, 99, 9, 1, 3, 5, 7)
+	for(j in 1:length(innings)){
+
+		bets_DB$GAGNANT[[j]][, Inn. := eval(innings[j])]
+		bets_DB$GAGNANT[[j]][, Bet_Type := "WINNER"]
+
+		bets_DB$GAGNANT[[j]][Bet_On2 == "Home", Bet_On := Team_Home]
+		bets_DB$GAGNANT[[j]][Bet_On2 == "Away", Bet_On := Team_Away]
+		bets_DB$GAGNANT[[j]][Bet_On2 == "None", Bet_On := "None"]
+
+	}
+
+
+	#ECART
+	innings <- seq(from = 3, to = 9, by = 2)
+	for(j in 1:length(innings)){
+
+		bets_DB$ECART[[j]][, Inn. := eval(innings[j])]
+		bets_DB$ECART[[j]][, Bet_Type := "SPREAD"]
+
+		bets_DB$ECART[[j]][Bet_On2 == "Home", Bet_On := Team_Home]
+		bets_DB$ECART[[j]][Bet_On2 == "Away", Bet_On := Team_Away]
+		bets_DB$ECART[[j]][Bet_On2 == "None", Bet_On := "None"]
+
+	}
+
+
+	#TOTAL, ODD/EVEN
+	nm <- names(bets_DB$TOTAL)
+	indices <- list(odd_even = which(grepl("PAIR", nm, fixed = TRUE)),
+						both = which(!grepl("PAIR", nm, fixed = TRUE) & !grepl("SINGLE", nm, fixed = TRUE)), 
+						single = which(grepl("SINGLE", nm, fixed = TRUE)))
+
+	innings <- list(odd_even = seq(from = 3, to = 9, by = 2),
+							both = seq(from = 1, to = 9, by = 2),
+							single = seq(from = 3, to = 9, by = 2))
+
+	bet_type <- c("ODD/EVEN", "SUM", "POINTS")
+
+	for(k in 1:length(indices)){
+
+		for(j in 1:length(indices[[k]])){
+
+			bets_DB$TOTAL[[indices[[k]][j]]][, Inn. := eval(innings[[k]][j])]
+			bets_DB$TOTAL[[indices[[k]][j]]][, Bet_Type := bet_type[k]]
+
+			if(k > 1){
+
+				x <- which(grepl("Plus", bets_DB$TOTAL[[indices[[k]][j]]]$Bet_On, fixed = TRUE))
+				bets_DB$TOTAL[[indices[[k]][j]]][x, Bet_On := "Above"]
+				bets_DB$TOTAL[[indices[[k]][j]]][-x, Bet_On := "Below"]
+
+			} else {
+
+				bets_DB$TOTAL[[indices[[k]][j]]][Bet_On == "Impair", Bet_On := "Odd"]
+				bets_DB$TOTAL[[indices[[k]][j]]][Bet_On == "Pair", Bet_On := "Even"]
+
+			}
+
+		}
+
+	}
+
+	#MARGIN
+	innings <- seq(from = 3, to = 9, by = 2)
+	for(j in 1:length(innings)){
+
+		bets_DB$MARGE[[j]] <- bets_DB$MARGE[[j]][Bet_On2 != "None"]
+		bets_DB$MARGE[[j]][Bet_Spread == 0, Bet_Spread := 6]
+
+		bets_DB$MARGE[[j]][, Inn. := eval(innings[j])]
+		bets_DB$MARGE[[j]][, Bet_Type := "MARGIN"]
+
+		bets_DB$MARGE[[j]][Bet_On2 == "Home", Bet_On := Team_Home]
+		bets_DB$MARGE[[j]][Bet_On2 == "Away", Bet_On := Team_Away]
+		bets_DB$MARGE[[j]][Bet_On2 == "None", Bet_On := "None"]
+
+	}
+
+	#1st
+	bets_DB$`PREMIER ARRIVE`$PREMIER[, Inn. := 9]
+	bets_DB$`PREMIER ARRIVE`$PREMIER[, Bet_Spread := as.integer(stringr::str_split(bets_DB$`PREMIER ARRIVE`$PREMIER$Bet_Type, " ", simplify = TRUE)[, 4])]
+
+	bets_DB$`PREMIER ARRIVE`$PREMIER[, Bet_Type := "FIRST"]
+
+	bets_DB$`PREMIER ARRIVE`$PREMIER[Bet_On2 == "Home", Bet_On := Team_Home]
+	bets_DB$`PREMIER ARRIVE`$PREMIER[Bet_On2 == "Away", Bet_On := Team_Away]
+	bets_DB$`PREMIER ARRIVE`$PREMIER[Bet_On2 == "None", Bet_On := "None"]
+
+	bets_DB <- lapply(bets_DB, function(x){data.table::copy(dplyr::bind_rows(x))})
+	bets_DB <- data.table::copy(dplyr::bind_rows(bets_DB))
+
+	names(bets_DB)[which(names(bets_DB) == "Bet_Spread")] <- "Bet_Type2"
 
 
 	print("Saving...", quote = FALSE)
@@ -294,23 +439,16 @@ process_MiseOjeu_data <- function(path){
 	#Else update
 	} else {
 
-		for(i in 1:length(bets_DB)){
+		temp <- data.table::copy(unique(rbind(temp, bets_DB)))
 
-			a <- names(bets_DB[[i]][[j]])
-			b <- names(temp[[i]][[j]])
+		temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
+								by = c("Team_Home", "Team_Away", "Date"),
+								.SDcols = "Minutes_Until_Start"]
 
-			indices <- match(a, b)
-
-			for(j in 1:length(indices)){
-
-				temp[[i]][[indices[j]]] <- rbind(temp[[i]][[indices[j]]][Date < today], bets_DB[[i]][[j]])
-
-			}
-
-		}
+		temp <- temp[Most_Recent == TRUE]
+		temp[, Most_Recent := NULL]
 
 		saveRDS(temp, paste(folder_directory, "/Betting_Database.rds", sep = ""))
-
 
 	}
 

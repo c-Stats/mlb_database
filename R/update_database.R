@@ -505,20 +505,23 @@ update_database <- function(path){
 	scores[ML, Factor_Home_Historical := round(i.Close_Home + 1, 2)]
 	scores[ML, Factor_Away_Historical := round(i.Close_Away + 1, 2)]
 
-	#Over / Under
-	scores[ML, OU_Home_Historical := i.CloseOU_Home]
-	scores[ML, OU_Away_Historical := i.CloseOU_Away]
 
-	scores[ML, OU_ML_Home_Historical := round(i.OU_ML_Close_Home + 1, 2)]
-	scores[ML, OU_ML_Away_Historical := round(i.OU_ML_Close_Away + 1, 2)]
+	#Check if we can add Loto-Qc data
+	folder_directory <- paste(path, "/MLB_Modeling/Betting/Predicted_Lineups", sep = "")
+	LQc_path <- paste(folder_directory, "/Betting_Database.rds", sep = "")
+	
+	if(file.exists(LQc_path)){
 
-	#RunLine
-	scores[ML, RunLine_Home_Historical := i.RunLine_Home]
-	scores[ML, RunLine_Away_Historical := i.RunLine_Away]
+		#Extract moneylines only
+		LQc <- readRDS(LQc_path)[Bet_Type == "WINNER" & Inn. == 9]
 
-	scores[ML, RunLine_ML_Home_Historical := round(i.RunLine_ML_Home + 1, 2)]
-	scores[ML, RunLine_ML_Away_Historical := round(i.RunLine_ML_Away + 1, 2)]
+		data.table::setkeyv(scores, c("Date", "Team_Home", "Team_Away"))
+		data.table::setkeyv(LQc, c("Date", "Team_Home", "Team_Away"))		
 
+		scores[LQc[Bet_On2 == "Home"], Factor_Home_Historical := i.Factor]
+		scores[LQc[Bet_On2 == "Away"], Factor_Away_Historical := i.Factor]
+
+	}
 
 	#Find the profit margin. 
 	#Assummed to be the same on both sides, i.e.: 1 / (1 + r_1 + c) + 1/(1 + r_2 + c) = 1
@@ -529,40 +532,34 @@ update_database <- function(path){
 	scores[, Profit_Margin_Historical := (-b + sqrt(b^2 - 4*c)) / 2]
 	scores[, P_Home_Win_Historical := 1 / (Factor_Home_Historical + Profit_Margin_Historical)]
 
-	#LotoQuebec data
-	ML_LotoQc <- data.table::fread(paste(path, "/MLB_Modeling/Betting/Predicted_Lineups/LotoQc_Moneylines_Clean.csv", sep = ""))
-	data.table::setkeyv(scores, c("Date", "Team_Home", "Team_Away"))
-	data.table::setkeyv(ML_LotoQc, c("Date", "Team_Home", "Team_Away"))
-
-	scores[ML_LotoQc, Factor_Home_LotoQc := round(i.Factor_Home, 2)]
-	scores[ML_LotoQc, Factor_Away_LotoQc := round(i.Factor_Away, 2)]
-
-	b <- scores$Factor_Home_LotoQc + scores$Factor_Away_LotoQc - 2
-	c <- scores$Factor_Home_LotoQc * scores$Factor_Away_LotoQc - scores$Factor_Home_LotoQc - scores$Factor_Away_LotoQc
-
-	scores[, Profit_Margin_LotoQc := (-b + sqrt(b^2 - 4*c)) / 2]
-	scores[, P_Home_Win_LotoQc := 1 / (Factor_Home_LotoQc + Profit_Margin_LotoQc)]
-
-
-	#Approximation for missing LotoQc data
-	mean_LotoQc_profit_margin <- mean(na.omit(scores$Profit_Margin_LotoQc))
-
-	scores[, Factor_Home_LotoQc_Approx := Factor_Home_LotoQc]
-	scores[, Factor_Away_LotoQc_Approx := Factor_Away_LotoQc]
-	scores[, Profit_Margin_LotoQc_Approx := Profit_Margin_LotoQc]
-
-	missing_val_index_LotoQc <- which(is.na(scores$Factor_Home_LotoQc) | is.na(scores$Factor_Away_LotoQc))
-	scores[missing_val_index_LotoQc, Factor_Home_LotoQc_Approx := Factor_Home_Historical + Profit_Margin_Historical - mean_LotoQc_profit_margin]
-	scores[missing_val_index_LotoQc, Factor_Away_LotoQc_Approx := Factor_Away_Historical + Profit_Margin_Historical - mean_LotoQc_profit_margin]
-	scores[missing_val_index_LotoQc, Profit_Margin_LotoQc_Approx := mean_LotoQc_profit_margin]
-
-	scores[, P_Home_Win_LotoQc_Approx := 1 / (Factor_Home_LotoQc_Approx + Profit_Margin_LotoQc_Approx)]
 
 	#Tag matches with avaible moneylines data
-	scores[, Avaible_for_Betting := scores$Avaible_for_Regr & !is.na(scores$P_Home_Win_LotoQc_Approx)]
+	scores[, Avaible_for_Betting := scores$Avaible_for_Regr & !is.na(scores$P_Home_Win_Historical)]
 	avaible_p <- round(100 * length(which(scores$Avaible_for_Betting)) / nrow(scores), 2)
 
 	print(paste(avaible_p, "% of the scrapped data is avaible for betting strategy testing purposes.", sep = ""), quote = FALSE)
+
+
+	#Estimate missing values 
+
+	#Replace missing values
+	fix <- scores[is.na(P_Home_Win_Historical), which = TRUE]
+	if(any(fix)){
+
+		for(j in fix){
+
+			other_instances <- scores[(Team_Home == scores[j]$Team_Home | Team_Away == scores[j]$Team_Away) & !is.na(P_Home_Win_Historical), which = TRUE]
+
+			dist <- abs(scores$Date[other_instances] - scores$Date[j])
+			dist[which(dist == 0)] <- max(dist) + 1
+
+			closest <- other_instances[which.min(dist)]
+			scores[j, P_Estim := scores$P_Home_Win_Historical[closest]]
+
+		}
+
+	} 
+
 
 
 

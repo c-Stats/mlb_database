@@ -4,7 +4,13 @@
 \alias{Extract_Markov_Chain_Data}
 \title{Extract and process data needed to set up Markov Chains}
 \usage{
-Extract_Markov_Chain_Data(date, lineup, params, id = NULL)
+Extract_Markov_Chain_Data(
+  date,
+  lineup,
+  params = list(n_season = 3, n_match_bat = 400, n_match_pitch = 400),
+  id = NULL,
+  p_home_win = 0.5
+)
 }
 \arguments{
 \item{date}{the date at which the match takes (or took) place}
@@ -16,7 +22,7 @@ Extract_Markov_Chain_Data(date, lineup, params, id = NULL)
 \item{id}{the match ID. Defaults to NULL; if specified, the lineup will be retrieved from historical files. (I.e.: use IDs to build a design matrix X post-webscrapping.)}
 }
 \value{
-A single row of the design matrix X given two teams and two rosters.
+A list of transition matrices
 }
 \description{
 This function returns transition and event matrices, condition points distribution,
