@@ -170,7 +170,7 @@ Compute_Fair_Factors <- function(path, n_simulations = NULL, ncores = NULL){
 
 			#Transition matrices
 			print("Computing transition matrices...", quote = FALSE)
-			markov <- try(Extract_Markov_Chain_Data(date = date, lineup = lineup, p_home_win = p_home_win), silent = TRUE)
+			markov <- Extract_Markov_Chain_Data(date = date, lineup = lineup, p_home_win = p_home_win)
 			#Failure to converge -> skip
 			if(is.null(markov) | class(markov)[1] == "try-error"){
 
