@@ -477,6 +477,11 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 						avg_t_mat[i, ] <- avg_t_mat[i, ] / sum(avg_t_mat[i, ])
 
+					} else {
+
+						avg_t_mat[i, ] <- avg_t_mat_ALL_INN[i, ]
+						avg_t_mat[i, ] <- avg_t_mat[i, ] / sum(avg_t_mat[i, ])
+
 					}
 
 			}
@@ -681,6 +686,10 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 							ordered_transitions[[j]][i, ] <- ordered_transitions[[j]][i, ] / s
 
+						} else {
+
+							ordered_transitions[[j]][i, ] <- avg_t_mat[i, ]
+
 						}
 
 						#2 outs and P(inning over) = 0 gets replaced with the average
@@ -793,6 +802,18 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 			names(ordered_transitions) <- c(1:length(ordered_transitions))
 			names(ordered_extra_moves) <- c(1:length(ordered_transitions))
 
+			#Re-calibrate
+			for(j in 1:length(ordered_transitions)){
+
+				for(m in 1:nrow(ordered_transitions[[j]])){
+
+					ordered_transitions[[j]][m, ] <- ordered_transitions[[j]][m, ] / sum(ordered_transitions[[j]][m, ])
+					ordered_extra_moves[[j]][m, ] <- ordered_extra_moves[[j]][m, ] / sum(ordered_extra_moves[[j]][m, ])
+
+				}
+
+			}
+
 			#Verify that the markov chain converges, for each step of the inning
 			no_convergence <- rep(FALSE, length(ordered_transitions))
 			spectral_gaps <- rep(0, length(ordered_transitions))
@@ -856,37 +877,15 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 			if(any(no_convergence)){
 
 				print(paste("Fixing non-converging steps for Inn. #", n, sep = ""), quote = FALSE)
-				print(paste("Number of non-converging steps:", length(which(no_convergence))), quote = FALSE)
+				print(paste("Number of non-converging steps to be replaced by the average accross the inning:", length(which(no_convergence))), quote = FALSE)
 
-				while(any(no_convergence)){
+				fix <- which(no_convergence)
 
-					fix <- which(no_convergence)[1]
-					avaible <- which(!no_convergence)
-					closest <- order(abs(avaible - fix))
-					closest <- closest[c(1:min(3, length(closest)))]
+					for(j in fix){
 
-					if(length(closest) == 1){
-
-						print("Fix failed; return NULL", quote = FALSE)
-						return(NULL)
+						ordered_transitions[[j]] <- avg_t_mat
 
 					}
-
-					nmat <- length(closest)
-					closest <- closest[closest != fix]
-					for(j in closest){
-
-						ordered_transitions[[fix]] <- ordered_transitions[[fix]] + ordered_transitions[[j]]
-						ordered_extra_moves[[fix]] <- ordered_extra_moves[[fix]] + ordered_extra_moves[[j]]
-
-					}
-
-					ordered_transitions[[fix]] <- ordered_transitions[[fix]] / nmat
-					ordered_extra_moves[[fix]] <- ordered_extra_moves[[fix]] / nmat
-
-					no_convergence[fix] <- FALSE
-
-				}
 
 			}
 
@@ -903,7 +902,7 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 			v[1] <- 1
 
 			ev <- eigen(M)
-			spectral_gap <- Mod(ev$values[2])
+			spectral_gap <- Mod(ev$values[2])^(1 / length(ordered_transitions))
 			all_spectral_gaps[[length(all_spectral_gaps) + 1]] <- spectral_gap
 
 			d_mat <- diag(rep(0, length(v)))
@@ -978,7 +977,7 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 	#Address slow convergence issues
 	for(k in 1:2){
 
-		fix <- spec_gaps[[k]][Convergence_Bound >= 0.01, which = TRUE]
+		fix <- spec_gaps[[k]][Convergence_Bound >= 0.65, which = TRUE]
 		if(any(fix)){
 
 			print(paste("Fixing", length(fix), "slow-converging inning chain(s) for the", names(spec_gaps)[k], "team."), quote = FALSE)
@@ -996,9 +995,11 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 				}
 
 				ev <- eigen(new_mat)
-				convergence_rate <- Mod(ev$values[2])
+				convergence_rate <- Mod(ev$values[2])^(1 / length(output[[k]][[j]]$first))
 
-				if(convergence_rate  >= 0.01){
+				spec_gaps[[k]]$Convergence_Bound[j] <- convergence_rate
+
+				if(convergence_rate  >= 0.65){
 
 					print(paste("WARNING: PERSISTENT SLOW CONVERGENCE RATE FOR INNING #", j, sep = ""), quote = FALSE)
 
@@ -1009,6 +1010,15 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 		}
 
 	}
+
+	print("BOUNDS FOR CONVERGENCE RATES (rounded, 4):", quote = FALSE)
+	for(i in 1:length(spec_gaps)){
+
+		spec_gaps[[i]][, Convergence_Bound := round(Convergence_Bound, 4)]
+
+	}
+
+	print(spec_gaps)
 
 	return(output)
 
