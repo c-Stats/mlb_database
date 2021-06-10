@@ -156,13 +156,10 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 	}
 
 	output <- list()
+	spec_gaps <- list()
 
 	#Get the treshold for win/loss classification based on historical implied probabilities
-	#Used to get the conditional markov chain for the favourite and the underdog
-
-	
-
-	
+	#Used to get the conditional markov chain for the favourite and the underdog	
 	auroc_obj <- pROC::roc(scores[!is.na(P_Home_Win_Historical)]$Win,
 							scores[!is.na(P_Home_Win_Historical)]$P_Home_Win_Historical)
 
@@ -370,8 +367,22 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 		data.table::setkeyv(frames$bat, c("Inn.", "Move_n"))
 		transition_matrices <- list()
 
-		#avg_t_mat <- get_transition_matrix(frames$bat[Move_n == 1], weights = "Weights_Avg")
-		avg_t_mat <- get_transition_matrix(frames$bat[Move_n == 1])
+
+		#Compute the average transition matrix
+		first_move <- frames$bat[Move_n == 1]
+
+		players <- unique(first_move$Batter_Name2)
+		transition_matrices_per_player <- lapply(players, function(p){get_transition_matrix(first_move[Batter_Name2 == p])})
+
+		for(j in 2:length(transition_matrices_per_player)){
+
+			transition_matrices_per_player[[1]] <- transition_matrices_per_player[[1]] + transition_matrices_per_player[[j]]
+
+		}
+
+		avg_t_mat <- transition_matrices_per_player[[1]] / length(transition_matrices_per_player)
+		transition_matrices_per_player <- NULL
+
 		for(i in 1:(nrow(play_by_play$states) - 1)){
 
 				n_out <- play_by_play$states$Outs[i]
@@ -397,10 +408,31 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 		d_mat <- diag(eigenvals$values)
 		d_mat[-j] <- 0
 
-		terminal_state <- round(Re(v %*% eigenvals$vectors %*% d_mat %*% solve(eigenvals$vectors)), 10)
+		terminal_state <- try(Mod(v %*% eigenvals$vectors %*% d_mat %*% solve(eigenvals$vectors)), silent = TRUE)
+		if(class(terminal_state)[1] == "try-error"){
+
+			dummy <- avg_t_mat
+			for(i in 1:10){dummy <- dummy %*% dummy}
+			terminal_state <- v %*% dummy
+
+		}
+
+		if(class(terminal_state)[1] != "try-error"){
+
+			if(any(which(Mod(terminal_state) > 1))){
+
+				dummy <- avg_t_mat
+				for(i in 1:10){dummy <- dummy %*% dummy}
+				terminal_state <- v %*% dummy
+
+			}
+
+		}
+
 		terminal_state <- terminal_state / sum(terminal_state)
 
-		if(terminal_state[length(terminal_state)] != 1){
+
+		if(sum(terminal_state[-length(terminal_state)]) >= 10^(-6) | terminal_state[length(terminal_state)] <= 1 - 10^(-6)){
 
 			print("Error: the average transition matrix over all innings doesn't converge to the absorbing state.", quote = FALSE)
 			print("Returning NULL.", quote = FALSE)
@@ -409,12 +441,86 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 		}
 
 
+		#Save the overall matrix
+		avg_t_mat_ALL_INN <- avg_t_mat
+
+		all_spectral_gaps <- list()
+
 		pb <- txtProgressBar(min = 0, max = 9, style = 3)
 		print(paste("Computing transition matrices for the", c("home", "visiting")[k], "team..."), quote = FALSE)
 		for(n in 1:9){
 
 			first_move <- data.table::copy(frames$bat[.(n, 1), c("Batter_Name2", "i", "j", "Points_scored_bat"), with = FALSE])
 			extra_move <- data.table::copy(frames$bat[.(n, 2), c("Batter_Name2", "i", "j", "Points_scored_bat"), with = FALSE])
+
+			#Build the average transition matrix for the inning 
+			players <- unique(first_move$Batter_Name2)
+			transition_matrices_per_player <- lapply(players, function(p){get_transition_matrix(first_move[Batter_Name2 == p])})
+
+			for(j in 2:length(transition_matrices_per_player)){
+
+				transition_matrices_per_player[[1]] <- transition_matrices_per_player[[1]] + transition_matrices_per_player[[j]]
+
+			}
+
+			avg_t_mat <- transition_matrices_per_player[[1]] / length(transition_matrices_per_player)
+			transition_matrices_per_player <- NULL
+
+			for(i in 1:(nrow(play_by_play$states) - 1)){
+
+					n_out <- play_by_play$states$Outs[i]
+					no_access <- which(play_by_play$states$Outs < n_out)
+					avg_t_mat[i, no_access] <- 0
+
+					s <- sum(avg_t_mat[i, ])
+					if(s > 0){
+
+						avg_t_mat[i, ] <- avg_t_mat[i, ] / sum(avg_t_mat[i, ])
+
+					}
+
+			}
+
+
+			#Verify that the markov chain converges
+			eigenvals <- eigen(avg_t_mat)
+			j <- which(Mod(eigenvals$values) == 1)
+
+			v <- rep(0, nrow(avg_t_mat))
+			v[1] <- 1
+
+			d_mat <- diag(eigenvals$values)
+			d_mat[-j] <- 0
+
+			terminal_state <- try(Mod(v %*% eigenvals$vectors %*% d_mat %*% solve(eigenvals$vectors)), silent = TRUE)
+			if(class(terminal_state)[1] == "try-error"){
+
+				dummy <- avg_t_mat
+				for(i in 1:10){dummy <- dummy %*% dummy}
+				terminal_state <- v %*% dummy
+
+			}
+
+			if(class(terminal_state)[1] != "try-error"){
+
+				if(any(which(Mod(terminal_state) > 1))){
+
+					dummy <- avg_t_mat
+					for(i in 1:10){dummy <- dummy %*% dummy}
+					terminal_state <- v %*% dummy
+
+				}
+
+			}
+
+			terminal_state <- terminal_state / sum(terminal_state)
+
+			if(sum(terminal_state[-length(terminal_state)]) >= 10^(-6) | terminal_state[length(terminal_state)] <= 1 - 10^(-6)){
+
+				print(paste("The average transition matrix over inning #", n, " doesn't converge. It will be replaced by the average over all innings.", sep = ""), quote = FALSE)
+				avg_t_mat <- avg_t_mat_ALL_INN
+
+			}			
 
 			players <- unique(first_move$Batter_Name2)
 			nth_event <- c(1:max(batting_orders[[n]]$Batting_Order))
@@ -557,6 +663,7 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 			}
 
 
+			printed_once <- FALSE
 			#Prevent transitions of the type out_i+1 < out_i
 			for(i in 1:(nrow(play_by_play$states) - 1)){
 
@@ -578,6 +685,13 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 						#2 outs and P(inning over) = 0 gets replaced with the average
 						if(n_out == 2 & ordered_transitions[[j]][i, nrow(ordered_transitions[[j]])] == 0 & s != 0){
+
+							if(!printed_once){
+
+								print("Replacing states with 2 outs such that P(Game over on next move) = 0 with their averages accross all innings...", quote = FALSE)
+
+							}
+							printed_once <- TRUE
 
 							ordered_transitions[[j]][i, ] <- avg_t_mat[i, ]
 
@@ -604,6 +718,7 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 			}
 
 
+			printed_once <- FALSE
 			#Replace rows belonging to never-visited states with the average accross all innings
 			for(j in 1:length(ordered_transitions)){
 
@@ -611,12 +726,22 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 				rmv <- which(n_access == 0)
 				if(length(rmv) > 0){
 
+					if(!printed_once){
+
+						print("Replacing never-visited state(s)'s transition probabilities with their averages accross all innings", quote = FALSE)
+
+					}
+					
+					printed_once <- TRUE
+
 					ordered_transitions[[j]][rmv, ] <- avg_t_mat[rmv, ]
 
 				}
 
 			}
 
+
+			printed_once <- FALSE
 			#Replace absorbing states with the average accross all innings
 			for(j in 1:length(ordered_transitions)){
 
@@ -628,6 +753,13 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 				index <- which(!is.na(single_issue))
 				if(length(index) == 1){next}
+
+				if(!printed_once){
+
+					print("Replacing rows != 25 containing an absorbing state...", quote = FALSE)
+
+				}
+				printed_once <- TRUE
 
 				single_issue <- cbind(index, single_issue[index])
 				single_issue <- single_issue[-nrow(single_issue), ]
@@ -663,40 +795,68 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 			#Verify that the markov chain converges, for each step of the inning
 			no_convergence <- rep(FALSE, length(ordered_transitions))
+			spectral_gaps <- rep(0, length(ordered_transitions))
 
 			M <- ordered_transitions[[1]] %*% ordered_extra_moves[[1]]
-			for(j in 2:4){
+			ev <- eigen(M)
+			spectral_gaps[1] <- 1 - Mod(ev$values[2])
+
+			for(j in 2:2){
 
 				M <- M %*% ordered_transitions[[j]] %*% ordered_extra_moves[[j]]
+				ev <- eigen(M)
+				spectral_gaps[j] <- 1 - Mod(ev$values[2])
 
 			}
 
 
-			for(j in 4:length(ordered_transitions)){
+			for(j in 3:length(ordered_transitions)){
 
-				A <- M 
-				#Obtain odds for 2^5 full rotations, which should occur with P ~ 0
-				for(j in 1:5){A <- A %*% A}
 
+				M <- M %*% ordered_transitions[[j]] %*% ordered_extra_moves[[j]]
+				ev <- eigen(M)
+				spectral_gaps[j] <- 1 - Mod(ev$values[2])
+
+				#Obtain the steady state
 				v <- rep(0, nrow(avg_t_mat))
 				v[1] <- 1
 
-				terminal_state <- round(v %*% A, 40)
-				terminal_state <- terminal_state / sum(terminal_state)
+				steady_state <- diag(rep(0, length(v)))
+				steady_state[1] <- 1
+				terminal_state <- try(Mod(v %*% ev$vectors %*% steady_state %*% solve(ev$vectors)), silent = TRUE)
+				
+				if(class(terminal_state)[1] == "try-error"){
 
-				no_convergence[j] <- terminal_state[length(terminal_state)] != 1
-
-				if(j < length(ordered_transitions)){
-
-					M <- M %*% ordered_transitions[[j + 1]] %*% ordered_extra_moves[[j + 1]]
+					dummy <- M
+					for(i in 1:10){dummy <- dummy %*% dummy}
+					terminal_state <- v %*% dummy
 
 				}
+
+				if(class(terminal_state)[1] != "try-error"){
+
+					if(any(which(Mod(terminal_state) > 1))){
+
+						dummy <- M
+						for(i in 1:10){dummy <- dummy %*% dummy}
+						terminal_state <- v %*% dummy
+
+					}
+
+				}
+
+				terminal_state <- terminal_state / sum(terminal_state)
+
+
+				#P(Not converged = 1 / 1 000 000) gets treated as failure to converge
+				no_convergence[j] <- terminal_state[length(terminal_state)] <= 1 - 10^(-6) 
 
 			}
 
 			if(any(no_convergence)){
 
 				print(paste("Fixing non-converging steps for Inn. #", n, sep = ""), quote = FALSE)
+				print(paste("Number of non-converging steps:", length(which(no_convergence))), quote = FALSE)
 
 				while(any(no_convergence)){
 
@@ -737,16 +897,44 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 				M <- M %*% ordered_transitions[[j]] %*% ordered_extra_moves[[j]]
 
 			}
-			#Obtain odds for 32 full rotations, which should occur with P ~ 0
-			for(j in 1:5){M <- M %*% M}
-	
+
+			#Obtain the steady state
 			v <- rep(0, nrow(avg_t_mat))
 			v[1] <- 1
 
-			terminal_state <- round(v %*% M, 40)
+			ev <- eigen(M)
+			spectral_gap <- Mod(ev$values[2])
+			all_spectral_gaps[[length(all_spectral_gaps) + 1]] <- spectral_gap
+
+			d_mat <- diag(rep(0, length(v)))
+			d_mat[1] <- 1
+
+			terminal_state <- try(Mod(v %*% ev$vectors %*% d_mat %*% solve(ev$vectors)), silent = TRUE)
+			if(class(terminal_state)[1] == "try-error"){
+
+				dummy <- M
+				for(i in 1:10){dummy <- dummy %*% dummy}
+				terminal_state <- v %*% dummy
+
+			}
+
+
+			if(class(terminal_state)[1] != "try-error"){
+
+				if(any(which(Mod(terminal_state) > 1))){
+
+					dummy <- M
+					for(i in 1:10){dummy <- dummy %*% dummy}
+					terminal_state <- v %*% dummy
+
+				}
+
+			}
+
 			terminal_state <- terminal_state / sum(terminal_state)
 
-			if(terminal_state[length(terminal_state)] != 1){
+			#Same criteria for failure to converge
+			if(terminal_state[length(terminal_state)] <= 1 - 10^(-6)){
 
 				if(n == 1){
 
@@ -775,9 +963,52 @@ Extract_Markov_Chain_Data <- function(date, lineup, params = list(n_season = 3,
 
 		output[[k]] <- transition_matrices
 
+		all_spectral_gaps <- unlist(all_spectral_gaps)
+		all_spectral_gaps <- data.table::as.data.table(all_spectral_gaps)
+		all_spectral_gaps[, Inn. := c(1:9)]		
+		names(all_spectral_gaps)[1] <- "Convergence_Bound"
+
+		spec_gaps[[length(spec_gaps) + 1]] <- all_spectral_gaps[, c("Inn.", "Convergence_Bound"), with = FALSE]
+
 	}
 
 	names(output) <- c("home", "away")
+	names(spec_gaps) <- c("home", "away")
+
+	#Address slow convergence issues
+	for(k in 1:2){
+
+		fix <- spec_gaps[[k]][Convergence_Bound >= 0.01, which = TRUE]
+		if(any(fix)){
+
+			print(paste("Fixing", length(fix), "slow-converging inning chain(s) for the", names(spec_gaps)[k], "team."), quote = FALSE)
+
+			for(j in fix){
+
+				new_mat <- diag(rep(1), length(v))
+
+				for(m in 1:length(output[[k]][[j]]$first)){
+
+					output[[k]][[j]]$first[[m]] <- 0.5 * output[[k]][[j]]$first[[m]] + 0.5 * avg_t_mat_ALL_INN
+
+					new_mat <- new_mat %*% output[[k]][[j]]$first[[m]] %*% output[[k]][[j]]$extra[[m]]
+
+				}
+
+				ev <- eigen(new_mat)
+				convergence_rate <- Mod(ev$values[2])
+
+				if(convergence_rate  >= 0.01){
+
+					print(paste("WARNING: PERSISTENT SLOW CONVERGENCE RATE FOR INNING #", j, sep = ""), quote = FALSE)
+
+				}
+
+			}
+
+		}
+
+	}
 
 	return(output)
 
