@@ -102,12 +102,12 @@ process_Pinnacle_data <- function(path){
 	#Save if no previous file was found
 	if(!update){
 
-		saveRDS(bets_DB, paste(folder_directory, "/Betting_Database_Pinnacle.rds", sep = ""))
+		saveRDS(bets, paste(folder_directory, "/Betting_Database_Pinnacle.rds", sep = ""))
 
 	#Else update
 	} else {
 
-		temp <- data.table::copy(unique(rbind(temp, bets_DB)))
+		temp <- data.table::copy(unique(rbind(temp, bets)))
 
 		temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
 								by = c("Team_Home", "Team_Away", "Date"),
