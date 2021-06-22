@@ -73,6 +73,12 @@ process_Pinnacle_data <- function(path){
 
 		bets[[length(bets)]] <- bets[[length(bets)]][Minutes_Until_Start <= 12 * 60]
 
+		#Retain the betting opportunities avaible before the first match started
+		#I.e.: we can use portfolio theory to allocate different capital sums to different betting opportunities
+		#This wouldn't be possible if we used information given to us AFTER the first match started
+		max_time <- min(bets[[length(bets)]]$Game_Time)
+		bets[[length(bets)]] <- bets[[length(bets)]][Scrapping_Time <= max_time]		
+
 		#Retain the most recently scrapped values for each pair of teams
 		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
 								by = c("Team_Home", "Team_Away"),
