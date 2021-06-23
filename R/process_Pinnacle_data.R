@@ -115,12 +115,12 @@ process_Pinnacle_data <- function(path){
 
 		temp <- data.table::copy(unique(rbind(temp, bets)))
 
-		temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								by = c("Team_Home", "Team_Away", "Date"),
-								.SDcols = "Minutes_Until_Start"]
+		#temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
+								#by = c("Team_Home", "Team_Away", "Date"),
+								#.SDcols = "Minutes_Until_Start"]
 
-		temp <- temp[Most_Recent == TRUE]
-		temp[, Most_Recent := NULL]
+		#temp <- temp[Most_Recent == TRUE]
+		#temp[, Most_Recent := NULL]
 
 		saveRDS(temp, paste(folder_directory, "/Betting_Database_Pinnacle.rds", sep = ""))
 

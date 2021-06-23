@@ -72,6 +72,11 @@ process_MiseOjeu_data <- function(path){
 		bets[[length(bets)]][, Game_Time := as.POSIXct(Game_Time)]
 		bets[[length(bets)]][, Date := as.Date(stringr::str_split(Game_Time, " ", simplify = TRUE)[, 1])]
 
+		#Fix gametime
+		fix <- as.numeric(strftime(bets[[length(bets)]]$Game_Time, format="%H")) < 12
+		if(any(fix))
+		bets[[length(bets)]][fix, Game_Time := Game_Time + 12*60*60]
+
 
 		bets[[length(bets)]][, Minutes_Until_Start := (Game_Time - Scrapping_Time)/60]
 
@@ -81,20 +86,27 @@ process_MiseOjeu_data <- function(path){
 		#Retain the betting opportunities avaible before the first match started
 		#I.e.: we can use portfolio theory to allocate different capital sums to different betting opportunities
 		#This wouldn't be possible if we used information given to us AFTER the first match started
+
 		max_time <- min(bets[[length(bets)]]$Game_Time)
 		bets[[length(bets)]] <- bets[[length(bets)]][Scrapping_Time <= max_time]
 
+
+
 		#Retain the most recently scrapped values for each pair of teams
-		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								by = c("Team_Home", "Team_Away"),
-								.SDcols = "Minutes_Until_Start"]
+		#bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
+								#by = c("Team_Home", "Team_Away"),
+								#.SDcols = "Minutes_Until_Start"]
 
-		bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
+		#bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
 
-		bets[[length(bets)]][, Most_Recent := NULL]
-		bets[[length(bets)]][, Game_Starts_In := NULL]
+		#bets[[length(bets)]][, Most_Recent := NULL]
+		if("Game_Starts_In" %in% names(bets[[length(bets)]])){
+
+			bets[[length(bets)]][, Game_Starts_In := NULL]
+
+		}
+		
 		bets[[length(bets)]][, Game_Started := NULL]
-
 
 	}
 
@@ -447,12 +459,12 @@ process_MiseOjeu_data <- function(path){
 
 		temp <- data.table::copy(unique(rbind(temp, bets_DB)))
 
-		temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								by = c("Team_Home", "Team_Away", "Date"),
-								.SDcols = "Minutes_Until_Start"]
+		#temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
+								#by = c("Team_Home", "Team_Away", "Date"),
+								#.SDcols = "Minutes_Until_Start"]
 
-		temp <- temp[Most_Recent == TRUE]
-		temp[, Most_Recent := NULL]
+		#temp <- temp[Most_Recent == TRUE]
+		#temp[, Most_Recent := NULL]
 
 		saveRDS(temp, paste(folder_directory, "/Betting_Database.rds", sep = ""))
 

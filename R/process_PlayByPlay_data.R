@@ -236,7 +236,7 @@ process_PlayByPlay_data <- function(path){
 		play_by_play[[i]][, Team_Pitch := sapply(Pitcher_Name, l3_char)]
 		play_by_play[[i]][, Team_Bat := sapply(Batter_Name, l3_char)]
 
-		play_by_play[[i]] <- play_by_play[[i]][!is.na(Batter_Name)]
+		#play_by_play[[i]] <- play_by_play[[i]][!is.na(Batter_Name)]
 
 
 	}
@@ -271,5 +271,7 @@ process_PlayByPlay_data <- function(path){
 		saveRDS(old_pbp, saving_path)
 
 	}
+
+	print(paste("Most recent match played on:", max(play_by_play[[length(play_by_play)]]$Date)), quote = FALSE)
 
 }
