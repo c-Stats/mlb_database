@@ -48,5 +48,5 @@ mlbDatabase::arbitrage(path)
 
 ``` 
 
-Note: the optimal weights for the portfolios are computed using a multivariate extend of the Kelly criterion, alongside a second-order series approximation. The variance-covariance matrix
+Note: the optimal weights for the portfolios are computed using a multivariate extend of the Kelly criterion, alongside a second-order series approximation. (No negative weights are allowed). The variance-covariance matrix
 of the expected returns is estimated using historical data ranging from 2011 to 2020. (We do NOT consider betting outcomes to be independent, unless they each pertain to different matchups between different teams. Doing otherwise would be foolish.)
