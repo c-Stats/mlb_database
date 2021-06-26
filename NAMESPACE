@@ -2,11 +2,13 @@
 
 export(Setup_Markov_Database)
 export(arbitrage)
+export(compute_covariance_matrices)
 export(process_MiseOjeu_data)
 export(process_Pinnacle_data)
 export(process_PlayByPlay_data)
 export(update_database)
 export(update_design_matrix)
+import(RcppAlgos)
 import(alabama)
 import(caret)
 import(cutpointr)

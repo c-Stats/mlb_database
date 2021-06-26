@@ -15,6 +15,7 @@
 #' @import zoo
 #' @import ggplot2
 
+
 arbitrage <- function(path){
 
 	#################################################################################################
@@ -37,8 +38,10 @@ arbitrage <- function(path){
 	offers$pinnacle[, Date := as.Date(Date)]
 
 	#Remove wrong data
-	rmv <- offers$pinnacle[Date < as.Date("2021-06-20") & Bet_Type == "POINTS", which = TRUE]
-	offers$pinnacle <- offers$pinnacle[-rmv]
+	offers$pinnacle <- offers$pinnacle[Date >= as.Date("2021-06-22")]
+	#rmv <- offers$pinnacle[Date < as.Date("2021-06-20") & Bet_Type == "POINTS", which = TRUE]
+	#offers$pinnacle <- offers$pinnacle[-rmv]
+
 
 
 	path_check <- paste(folder_directory, "/Betting_Database.rds", sep = "")
@@ -73,28 +76,33 @@ arbitrage <- function(path){
 	path_save <- paste(folder_directory, "/Arbitrage.rds", sep = "")
 	if(file.exists(path_save)){
 
-		update <- TRUE
 		old_file <- readRDS(path_save)
+		dates_done <- sort(unique(readRDS(path_save)$both$pinnacle$Date))
 
-		dates_done <- unique(readRDS(path_save)$both$pinnacle$Date)	
-		dates_done <- dates_done[which(dates_done != Sys.Date())]
+		if(length(dates_done) > 2){
 
-		#Remove today's data from the old file
-		for(i in 1:3){
+			update <- TRUE
+			dates_done <- dates_done[1:(length(dates_done) - 2)]	
 
-			old_file[[i]] <- lapply(old_file[[i]], function(x){x[Date != Sys.Date()]})
+			#Remove today's data from the old file
+			for(i in 1:3){
+
+				old_file[[i]] <- lapply(old_file[[i]], function(x){x[Date %in% dates_done]})
+
+			}
+
+			for(i in 1:length(old_file$arbitrage_results)){
+
+				old_file$arbitrage_results[[i]] <- old_file$arbitrage_results[[i]][Date %in% dates_done]
+
+			}
+
+			#Remove old match from the offers
+			offers <- lapply(offers, function(x){x[!(Date %in% dates_done)]})
 
 		}
 
-		#Remove old match from the offers
-		offers <- lapply(offers, function(x){x[!(Date %in% dates_done)]})
-
 	}
-
-
-
-
-
 
 
 
@@ -828,6 +836,7 @@ arbitrage <- function(path){
 			data.table::setkeyv(temp, c("Team_Home", "Team_Away"))
 
 			vcov_matrices <- list()
+			third_moments <- list()
 			for(r in 1:nrow(matchups)){
 
 				subindex <- temp[matchups[r], which = TRUE]
@@ -863,6 +872,9 @@ arbitrage <- function(path){
 
 					vcov_matrices[[r]] <- as.matrix(temp2$Var[1])
 					colnames(vcov_matrices[[r]]) <- identifiers[1]
+
+
+
 					next
 
 				}
@@ -939,6 +951,9 @@ arbitrage <- function(path){
 			vcov_mat <- rbind(rep(0, nrow(vcov_mat)+1), cbind(rep(0, nrow(vcov_mat)), vcov_mat))
 			rownames(vcov_mat)[1] <- "No Bet"
 			colnames(vcov_mat)[1] <- "No Bet"
+
+
+
 
 
 			#Power series approximation 
@@ -1048,38 +1063,43 @@ arbitrage <- function(path){
 	}
 
 
-	#Add backs the old file
-	for(i in 1:length(output)){
 
-		for(j in 1:length(output[[i]])){
+	if(update){
 
-			if(nrow(output[[i]][[j]]) == 0){
+		#Add backs the old file
+		for(i in 1:length(output)){
 
-				output[[i]][[j]] <- old_file[[i]][[j]]
-				next
+			for(j in 1:length(output[[i]])){
 
-			}
+				if(nrow(output[[i]][[j]]) == 0){
 
-
-			must_contain <- names(old_file[[i]][[j]])
-			missing <- which(!must_contain %in% names(output[[i]][[j]]))
-
-			if(any(missing)){
-
-				for(x in names(old_file[[i]][[j]])[missing]){
-
-					output[[i]][[j]][, (x) := NA]
+					output[[i]][[j]] <- old_file[[i]][[j]]
+					next
 
 				}
-				
+
+
+				must_contain <- names(old_file[[i]][[j]])
+				missing <- which(!must_contain %in% names(output[[i]][[j]]))
+
+				if(any(missing)){
+
+					for(x in names(old_file[[i]][[j]])[missing]){
+
+						output[[i]][[j]][, (x) := NA]
+
+					}
+					
+				}
+
+				output[[i]][[j]] <- rbind(old_file[[i]][[j]], output[[i]][[j]])
+
 			}
-
-			output[[i]][[j]] <- rbind(old_file[[i]][[j]], output[[i]][[j]])
-
 
 		}
 
 	}
+
 
 
 
