@@ -130,6 +130,35 @@ arbitrage <- function(path){
 
 	}
 
+	for(i in 1:length(offers)){
+
+		offers[[i]][, Most_Recent := lapply(.SD, function(x){
+
+			out <- rep(FALSE, length(x))
+			out[which.max(x)] <- TRUE
+			return(out)
+
+		}), by = "ID_bet", .SDcols = "Scrapping_Time"]
+
+		offers[[i]] <- offers[[i]][Most_Recent == TRUE]
+
+		offers[[i]][, Lowest := lapply(.SD, function(x){
+
+			out <- rep(FALSE, length(x))
+			out[which.min(x)] <- TRUE
+			return(out)
+
+		}), by = "ID_bet", .SDcols = "Factor"]		
+
+		offers[[i]] <- offers[[i]][Lowest == TRUE]
+
+		offers[[i]][, Most_Recent := NULL]
+		offers[[i]][, Lowest := NULL]
+
+
+	}
+
+
 
 	offers$lotoQc <- offers$lotoQc[bets, nomatch = 0]
 	offers$lotoQc <- offers$lotoQc[, names(offers$pinnacle), with = FALSE]
@@ -620,11 +649,26 @@ arbitrage <- function(path){
 
 	output$results <- NULL
 
+	output <- lapply(output, function(x){
+
+		rmv <- x[is.na(Outcome) & Date != max(Date), which = TRUE]
+		if(any(rmv)){
+
+			x <- x[-rmv]
+
+		}
+
+		return(x)
+
+
+	})
+
 	output$past <- list(pinnacle = data.table::copy(output$pinnacle[!is.na(Outcome)]),
 							lotoQc = data.table::copy(output$lotoQc[!is.na(Outcome)]))
 
 	output$present <- list(pinnacle = data.table::copy(output$pinnacle[is.na(Outcome)]),
 							lotoQc = data.table::copy(output$lotoQc[is.na(Outcome)]))
+
 
 	output$both <- list(pinnacle = data.table::copy(output$pinnacle),
 							lotoQc = data.table::copy(output$lotoQc))
@@ -787,6 +831,19 @@ arbitrage <- function(path){
 	}		
 
 
+	for(i in 1:length(output$arbitrage_results)){
+
+		rmv <- output$arbitrage_results[[i]][is.na(R), which = TRUE]
+		rmv <- rmv[output$arbitrage_results[[i]][rmv, Date != max(Date)]]
+
+		if(length(rmv) > 0){
+
+			output$arbitrage_results[[i]] <- output$arbitrage_results[[i]][-rmv]
+
+		}
+
+
+	}
 
 
 	#--------------------------------
@@ -1171,6 +1228,44 @@ arbitrage <- function(path){
 
 	output$metrics <- metrics
 	output$graphs <- graphs
+
+
+	#Graphs for returns
+	output$geometric_returns <- list()
+	for(i in 1:length(output$arbitrage_results)){
+
+		output$arbitrage_results[[i]][, N_bets := lapply(.SD, function(x){rep(length(x), length(x))}), by = "Date", .SDcols = "ID_bet"]
+		temp <- unique(output$arbitrage_results[[i]][, c("Mean_Abs_Lambda_Diff", 
+															"Optim_Val",
+															"Sharpe_Weighted",
+															"Weights_Total",
+															"Geom_Return_Daily",
+															"N_bets")])
+
+		temp <- temp[!is.na(Geom_Return_Daily)]
+		temp[, E_Geom_R := (1 + Optim_Val)^N_bets]
+
+		temp[, Geom_Return_Daily := Geom_Return_Daily - 1]
+		temp[, E_Geom_R := E_Geom_R - 1]
+
+		temp[, T := c(1:nrow(temp))]
+
+
+		output$geometric_returns[[i]] <- ggplot2::ggplot(data = temp) + ggplot2::geom_line(aes(x = T, y = Geom_Return_Daily, color = "Geometric Returns")) +
+												ggplot2::geom_line(aes(x = T, y = E_Geom_R, color = "Estimated Geometric Returns")) +
+												ggplot2::geom_hline(aes(yintercept = 0), color = "#E7B800", linetype = "dashed") +
+												ggplot2::xlab("Days elapsed") +
+												ggplot2::ylab("Value") + 
+												ggplot2::ggtitle("Observed vs Expected geometric returns") +
+												ggplot2::labs(color = "Legend")
+
+
+	}
+	names(output$geometric_returns) <- names(output$arbitrage_results)
+
+
+	print(output$graphs)
+
 	
 	#SAVE
 

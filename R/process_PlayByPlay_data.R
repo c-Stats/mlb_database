@@ -81,7 +81,16 @@ process_PlayByPlay_data <- function(path){
 
 	names(play_by_play) <- pbp_names
 
+	for(i in 1:length(play_by_play)){
 
+		rmv <- which(grepl( ")", names(play_by_play[[i]])))
+		if(any(rmv)){
+
+			play_by_play[[i]] <- play_by_play[[i]][, -rmv, with = FALSE]
+
+		}
+
+	}
 
 
 
@@ -102,6 +111,8 @@ process_PlayByPlay_data <- function(path){
 	#Tag team at bat / team at pitch
 	for(i in 1:length(play_by_play)){
 
+		play_by_play[[i]] <- play_by_play[[i]][!is.na(ID)]
+
 		IDs <- unique(play_by_play[[i]]$ID)
 		data.table::setkey(play_by_play[[i]], ID)
 
@@ -116,6 +127,7 @@ process_PlayByPlay_data <- function(path){
 		pb <- txtProgressBar(min = 0, max = length(IDs), style = 3)
 		count <- 0
 		for(id in IDs){
+
 
 			#Retrieve play-by-play frame
 			index_pbp <- play_by_play[[i]][.(id), which = TRUE]
