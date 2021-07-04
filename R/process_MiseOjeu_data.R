@@ -87,19 +87,29 @@ process_MiseOjeu_data <- function(path){
 		#I.e.: we can use portfolio theory to allocate different capital sums to different betting opportunities
 		#This wouldn't be possible if we used information given to us AFTER the first match started
 
-		max_time <- min(bets[[length(bets)]]$Game_Time)
+		#NOTE: we need to use Pinnacle's data
+		pinnacle_path <- paste(f_path, "/Bets_Pinnacle.csv", sep = "")
+		if(file.exists(pinnacle_path)){
+
+			max_time <- min(fread(pinnacle_path)$Game_Time)
+
+		} else {
+
+			max_time <- min(bets[[length(bets)]]$Game_Time)
+
+		}
+
+		
 		bets[[length(bets)]] <- bets[[length(bets)]][Scrapping_Time <= max_time]
 
 
+		#Retain the most recently scrapped values 
+		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == max(x)}),
+								.SDcols = "Scrapping_Time"]
 
-		#Retain the most recently scrapped values for each pair of teams
-		#bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								#by = c("Team_Home", "Team_Away"),
-								#.SDcols = "Minutes_Until_Start"]
+		bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
+		bets[[length(bets)]][, Most_Recent := NULL]
 
-		#bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
-
-		#bets[[length(bets)]][, Most_Recent := NULL]
 		if("Game_Starts_In" %in% names(bets[[length(bets)]])){
 
 			bets[[length(bets)]][, Game_Starts_In := NULL]

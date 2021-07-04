@@ -70,7 +70,6 @@ arbitrage <- function(path){
 
 
 
-
 	#Check if file already exists
 	update <- FALSE
 	path_save <- paste(folder_directory, "/Arbitrage.rds", sep = "")
@@ -834,11 +833,17 @@ arbitrage <- function(path){
 	for(i in 1:length(output$arbitrage_results)){
 
 		rmv <- output$arbitrage_results[[i]][is.na(R), which = TRUE]
-		rmv <- rmv[output$arbitrage_results[[i]][rmv, Date != max(Date)]]
 
 		if(length(rmv) > 0){
 
-			output$arbitrage_results[[i]] <- output$arbitrage_results[[i]][-rmv]
+			rmv <- rmv[output$arbitrage_results[[i]][rmv, Date != max(Date)]]
+
+			if(length(rmv) > 0){
+
+				output$arbitrage_results[[i]] <- output$arbitrage_results[[i]][-rmv]
+
+			}
+			
 
 		}
 
@@ -850,7 +855,7 @@ arbitrage <- function(path){
 	#Optimal bets
 
 	#Load Bernoulli CovMat to estimate the covariance between bets
-	path_load2 <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Bernoulli_CovMat.rds", sep = "")
+	path_load2 <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Bernoulli_CovMat2.rds", sep = "")
 	Bernoulli_CovMat <- readRDS(path_load2)
 
 
@@ -930,8 +935,6 @@ arbitrage <- function(path){
 					vcov_matrices[[r]] <- as.matrix(temp2$Var[1])
 					colnames(vcov_matrices[[r]]) <- identifiers[1]
 
-
-
 					next
 
 				}
@@ -956,26 +959,30 @@ arbitrage <- function(path){
 				
 				#Build the covariance matrix
 				Bernoulli_CovMat_subset <- Bernoulli_CovMat[index2, index2]
+				if(length(Bernoulli_CovMat_subset) > 1){
 
-				#Variances for the diagonal elements
-				variances <- temp2$Var
+					diag(Bernoulli_CovMat_subset) <- temp2$P * (1 - temp2$P)
 
-				#probability vector
-				p <- temp2$P
+				} else {
 
-				#Factor vector
-				F <- temp2$Factor
+					Bernoulli_CovMat_subset <- as.matrix(temp2$P * (1 - temp2$P))
 
-				#Estimate for the covariances
-				#E[I_1 * I_2] = alpha * sqrt(E[I_1] * E[I_2])
-				vcov_mat <- p %*% t(p) * Bernoulli_CovMat_subset - p %*% t(p)
-				diag(vcov_mat) <- p * (1 - p)
-				vcov_mat <- vcov_mat * (F %*% t(F))
+				}
+
+				vcov_mat <- (temp2$Factor %*% t(temp2$Factor)) * Bernoulli_CovMat_subset
+
+				min_eigenval <- min(eigen(vcov_mat)$values)
+				if(min_eigenval < 0){
+
+					vcov_mat <- vcov_mat + as.matrix(diag(-min_eigenval + 0.1, nrow(vcov_mat)))
+
+				}
 
 				if(length(vcov_mat) == 1){
 
 					vcov_mat <- as.matrix(vcov_mat)
 					colnames(vcov_mat) <- identifiers
+					rownames(vcov_mat) <- identifiers
 
 				}
 
@@ -1008,9 +1015,6 @@ arbitrage <- function(path){
 			vcov_mat <- rbind(rep(0, nrow(vcov_mat)+1), cbind(rep(0, nrow(vcov_mat)), vcov_mat))
 			rownames(vcov_mat)[1] <- "No Bet"
 			colnames(vcov_mat)[1] <- "No Bet"
-
-
-
 
 
 			#Power series approximation 
@@ -1078,7 +1082,7 @@ arbitrage <- function(path){
 			output$arbitrage_results[[i]][index, Optim_Val := -optim_sol$value]
 
 
-			#0.95 CI via bootstrap
+			#0.95 CI via gaussian approx
 			CI <- as.numeric(pars %*% mu) + c(-1, 1) * qnorm(0.975) * sqrt(as.numeric(t(pars) %*% vcov_mat %*% pars))
 			CI <- capital + capital * CI
 
@@ -1165,7 +1169,7 @@ arbitrage <- function(path){
 	webst <- c("Pinnacle", "LotoQc")
 	metrics <- list()
 
-	for(i in 1:length(output$past)){
+	for(i in 1:2){
 
 		temp <- output$past[[i]][Most_Recent == TRUE]
 
@@ -1265,6 +1269,13 @@ arbitrage <- function(path){
 
 
 	print(output$graphs)
+
+
+	cor_probabilities <- cbind(as.numeric(output$past$pinnacle$P1), as.numeric(output$past$lotoQc$P1))
+	colnames(cor_probabilities) <- c("Pinnacle", "LotoQc")
+	output$cor_probabilities <- cor(cor_probabilities)
+
+
 
 	
 	#SAVE

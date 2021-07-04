@@ -80,9 +80,8 @@ process_Pinnacle_data <- function(path){
 		bets[[length(bets)]] <- bets[[length(bets)]][Scrapping_Time <= max_time]		
 
 		#Retain the most recently scrapped values for each pair of teams
-		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								by = c("Team_Home", "Team_Away"),
-								.SDcols = "Minutes_Until_Start"]
+		bets[[length(bets)]][, Most_Recent := lapply(.SD, function(x){x == max(x)}),
+								.SDcols = "Scrapping_Time"]
 
 		bets[[length(bets)]] <- bets[[length(bets)]][Most_Recent == TRUE]
 

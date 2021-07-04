@@ -20,3 +20,5 @@ Imports:
     stringr,
     anytime,
     magrittr
+Depends: 
+    R (>= 2.10)
