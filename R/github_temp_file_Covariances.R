@@ -133,6 +133,9 @@ compute_covariance_matrices <- function(path){
 	path_save <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Bernoulli_CovMat.rds", sep = "")
 	saveRDS(probability_ratios, path_save)
 
+	path_save <- paste(path, "/MLB_Modeling/Scores/Clean_Data/Bernoulli_CovMat2.rds", sep = "")
+	saveRDS(var(Bernoulli_matrices), path_save)	
+
 
 }
 

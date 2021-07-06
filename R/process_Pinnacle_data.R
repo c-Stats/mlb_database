@@ -88,6 +88,32 @@ process_Pinnacle_data <- function(path){
 		bets[[length(bets)]][, Most_Recent := NULL]
 
 
+		#Fix an error where the half-matches were tagged as Inn. = 9 instead of Inn. = 5
+		if(date <= "2021-07-6"){
+
+			combinations <- unique(bets[[length(bets)]][, c("Team_Home", "Team_Away", "Bet_Type")])
+			combinations[, Bet_ID := c(1:nrow(combinations))]
+
+			for(i in 1:nrow(combinations)){
+
+				index <- bets[[length(bets)]][Team_Home == combinations$Team_Home[i] &
+												Team_Away == combinations$Team_Away[i] &
+												Bet_Type == combinations$Bet_Type[i], which = TRUE]
+
+				gap <- which(diff(index) != 1) 
+				if(!any(gap)){next}
+
+				gap <- gap[1] + 1
+				index <- index[gap:length(index)]
+
+				bets[[length(bets)]][index, Inn. := 5]
+
+			}
+
+
+		}		
+
+
 	}
 
 	if(length(bets) == 0){

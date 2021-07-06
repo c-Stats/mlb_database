@@ -260,7 +260,6 @@ arbitrage <- function(path){
 
 			}
 
-			if(margin > 0.5){break}
 
 		}
 
@@ -686,6 +685,13 @@ arbitrage <- function(path){
 	}
 
 
+	#Remove matches with missing IDs
+	for(i in 1:length(output$past)){
+
+		output$past[[i]] <- output$past[[i]][!is.na(ID)]
+		output$both[[i]] <- output$both[[i]][!is.na(ID)]
+
+	}
 
 
 
@@ -719,10 +725,17 @@ arbitrage <- function(path){
 			avaible <- output[[i]]$lotoQc[.(id)]
 			avaible <- avaible[Scrapping_Time <= timestamp]
 
-			if(nrow(avaible) == 0){next}
+			if(nrow(avaible) == 0){
 
-			output[[i]]$pinnacle[j, c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb") := avaible[which.max(Scrapping_Time), c("P1", "P2", "Scrapping_Time")]]
-			output[[i]]$pinnacle[j, Time_Diff := Scrapping_Time - Scrapping_Time_Arb]
+				output[[i]]$pinnacle[j, c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb") := NA]
+				output[[i]]$pinnacle[j, Time_Diff := NA]
+
+			} else {
+
+				output[[i]]$pinnacle[j, c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb") := avaible[which.max(Scrapping_Time), c("P1", "P2", "Scrapping_Time")]]
+				output[[i]]$pinnacle[j, Time_Diff := Scrapping_Time - Scrapping_Time_Arb]
+
+			}
 
 		}
 
@@ -743,13 +756,13 @@ arbitrage <- function(path){
 	#Arbitrage, Pinnacle
 	output$arbitrage_results <- list(
 
-		equal = output$both$arbitrage[E_R1 >= 0.001 & Website == "Pinnacle"] %>%
+		equal = output$both$arbitrage[E_R1 >= 0.01 & Website == "Pinnacle"] %>%
 					.[!is.na(Outcome), R := Factor * Outcome - 1] %>%
 					.[, P := P1_Arb] %>%
 					.[, Var := Var_R1] %>%
 					.[, E_R := E_R1],
 
-		proportional = output$both$arbitrage[E_R2 >= 0.001 & Website == "Pinnacle"] %>%
+		proportional = output$both$arbitrage[E_R2 >= 0.01 & Website == "Pinnacle"] %>%
 					.[!is.na(Outcome), R := Factor * Outcome - 1] %>%
 					.[, P := P2_Arb] %>%
 					.[, Var := Var_R2] %>%
@@ -761,7 +774,7 @@ arbitrage <- function(path){
 	output$arbitrage_results$mixed <- output$both$arbitrage
 	output$arbitrage_results$mixed[, P := (P1_Arb + P2_Arb)/2] 
 	output$arbitrage_results$mixed[, E_R := P * Factor - 1]
-	output$arbitrage_results$mixed <- output$arbitrage$mixed[E_R >= 0.001 & Website == "Pinnacle"]
+	output$arbitrage_results$mixed <- output$arbitrage$mixed[E_R >= 0.01 & Website == "Pinnacle"]
 
 	output$arbitrage_results$mixed[!is.na(Outcome), R := Factor * Outcome - 1]
 	output$arbitrage_results$mixed[, Var := Factor^2 *  P * (1 - P)]
@@ -860,6 +873,9 @@ arbitrage <- function(path){
 
 
 	for(i in 1:length(output$arbitrage_results)){
+
+		#Don't bet on Inn. == 5
+		output$arbitrage_results[[i]] <- output$arbitrage_results[[i]][Inn. == 9]
 
 		if(nrow(output$arbitrage_results[[i]]) == 0){next}
 
@@ -1276,8 +1292,6 @@ arbitrage <- function(path){
 	output$cor_probabilities <- cor(cor_probabilities)
 
 
-
-	
 	#SAVE
 
 	saveRDS(output, path_save)
