@@ -52,6 +52,7 @@ arbitrage <- function(path){
 	}
 	offers$lotoQc <- readRDS(path_check)	
 	offers$lotoQc <- offers$lotoQc[, names(offers$pinnacle), with = FALSE]
+	offers$lotoQc <- offers$lotoQc[Date %in% offers$pinnacle$Date]
 
 	offers$lotoQc[Bet_Type == "POINTS" & Bet_On == "Below", Bet_Type2 := - Bet_Type2]
 	offers$lotoQc[Bet_Type == "SUM" & Bet_On == "Below", Bet_Type2 := - Bet_Type2]
@@ -726,8 +727,8 @@ arbitrage <- function(path){
 
 			if(nrow(avaible) == 0){
 
-				output[[i]]$pinnacle[j, c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb") := NA]
-				output[[i]]$pinnacle[j, Time_Diff := NA]
+				#output[[i]]$pinnacle[j, c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb") := NA]
+				#output[[i]]$pinnacle[j, Time_Diff := NA]
 
 			} else {
 
@@ -737,6 +738,20 @@ arbitrage <- function(path){
 			}
 
 		}
+
+		if(!("P1_Arb" %in% names(output[[i]]$pinnacle))){
+
+			to_fill <- c("P1_Arb", "P2_Arb", "Scrapping_Time_Arb", "E_R1", "E_R2", "P1_Arb", "P2_Arb")
+			for(x in to_fill){
+
+				output[[i]]$pinnacle[, (x) := NA]
+
+			}
+		
+			next
+
+		}
+
 
 		output[[i]]$arbitrage <- output[[i]]$pinnacle[!is.na(P1_Arb)]
 		output[[i]]$arbitrage[, E_R1 := P1_Arb * Factor - 1]
@@ -1154,6 +1169,12 @@ arbitrage <- function(path){
 
 				}
 
+				if(length(old_file[[i]]) < j){
+
+					next
+
+				}
+
 
 				must_contain <- names(old_file[[i]][[j]])
 				missing <- which(!must_contain %in% names(output[[i]][[j]]))
@@ -1168,7 +1189,11 @@ arbitrage <- function(path){
 					
 				}
 
-				output[[i]][[j]] <- rbind(old_file[[i]][[j]], output[[i]][[j]])
+				if(nrow(old_file[[i]][[j]]) > 0){
+
+					output[[i]][[j]] <- rbind(old_file[[i]][[j]], output[[i]][[j]][, must_contain, with = FALSE])
+
+				}
 
 			}
 
