@@ -689,7 +689,6 @@ arbitrage <- function(path){
 	for(i in 1:length(output$past)){
 
 		output$past[[i]] <- output$past[[i]][!is.na(ID)]
-		output$both[[i]] <- output$both[[i]][!is.na(ID)]
 
 	}
 
@@ -1187,7 +1186,7 @@ arbitrage <- function(path){
 
 	for(i in 1:2){
 
-		temp <- output$past[[i]][Most_Recent == TRUE]
+		temp <- output$past[[i]][Most_Recent == TRUE & Inn. == 9]
 
 		#Use estimate with best log-loss
 		logloss1 <- abs(mean(log(temp$P1) * temp$Outcome + log(1 - temp$P1) * !temp$Outcome))

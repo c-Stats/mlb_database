@@ -40,7 +40,7 @@ process_MiseOjeu_data <- function(path){
 	if(file.exists(path_check)){
 
 		temp <- readRDS(path_check)
-		dates_done <- unique(temp$GAGNANT$moneyline$Date)
+		dates_done <- unique(temp$Date)
 
 		today <- Sys.Date()
 		dates_done <- dates_done[dates_done < today]
@@ -57,7 +57,7 @@ process_MiseOjeu_data <- function(path){
 
 		#Skip if already processed 
 		date <- as.Date(rev(stringr::str_split(f_path, "/")[[1]])[1], "%d-%m-%Y")
-		if(date %in% dates_done){
+		if(date %in% dates_done | date < "2021-06-22"){
 
 			next
 
@@ -129,6 +129,7 @@ process_MiseOjeu_data <- function(path){
 
 	names(bets) <- c(1:length(bets))
 	bets <- dplyr::bind_rows(bets)
+	bets <- bets[Date <= Sys.Date()]
 
 	#################################################################################################
 	#################################################################################################
@@ -166,14 +167,27 @@ process_MiseOjeu_data <- function(path){
 	bets_DB$GAGNANT <- list()
 
 	#Not in OT
+	#Not offered anymore ?
+
 	not_overtime <- which(grepl("rÃ©glementaire", bets_by_cat$GAGNANT$Bet_On))
-	bets_DB$GAGNANT$not_overtime <- bets_by_cat$GAGNANT[not_overtime, names(bets_by_cat$GAGNANT), with = FALSE]
-	bets_by_cat$GAGNANT <- bets_by_cat$GAGNANT[-not_overtime]
+	if(any(not_overtime)){
+
+		bets_DB$GAGNANT$not_overtime <- bets_by_cat$GAGNANT[not_overtime, names(bets_by_cat$GAGNANT), with = FALSE]
+		bets_by_cat$GAGNANT <- bets_by_cat$GAGNANT[-not_overtime]
+
+	}
+
 
 	#In OT
+	#Not offered anymore ?
 	overtime <- which(grepl("supplÃ©mentaires", bets_by_cat$GAGNANT$Bet_On))
-	bets_DB$GAGNANT$overtime <- bets_by_cat$GAGNANT[overtime, names(bets_by_cat$GAGNANT), with = FALSE]
-	bets_by_cat$GAGNANT <- bets_by_cat$GAGNANT[-overtime]
+	if(any(overtime)){
+
+		bets_DB$GAGNANT$overtime <- bets_by_cat$GAGNANT[overtime, names(bets_by_cat$GAGNANT), with = FALSE]
+		bets_by_cat$GAGNANT <- bets_by_cat$GAGNANT[-overtime]
+
+	}
+
 
 	#On the match, OT or not
 	on_win <- bets_by_cat$GAGNANT[Bet_Type == "GAGNANT A 2 ISSUES", which = TRUE]
@@ -257,22 +271,30 @@ process_MiseOjeu_data <- function(path){
 
 
 
-
+	#Not offered anymore?
 	index <- bets_by_cat$TOTAL[Bet_Type == "1ERE MANCHE - TOTAL DE POINTS", which = TRUE]
-	bets_DB$TOTAL$"1ERE MANCHE" <- bets_by_cat$TOTAL[index, names(bets_by_cat$TOTAL), with = FALSE]
-	bets_by_cat$TOTAL <- bets_by_cat$TOTAL[-index]
+	if(any(index)){
+
+		bets_DB$TOTAL$"1ERE MANCHE" <- bets_by_cat$TOTAL[index, names(bets_by_cat$TOTAL), with = FALSE]
+		bets_by_cat$TOTAL <- bets_by_cat$TOTAL[-index]
+
+	}
 
 
-	index <- which(grepl("PLUS/MOINS", bets_by_cat$TOTAL$Bet_Type))
+
+	index <- which(grepl("PLUS/MOINS", bets_by_cat$TOTAL$Bet_Type) & bets_by_cat$TOTAL$Bet_On2 == "None")
 	rmv <- c()
 	#After n innings
 	string_name <- "MANCHES"
+	string_name2 <- "PREMIERES MANCHES"
 	n_innings <- c(3, 5, 7)
 
 	for(n in n_innings){
 
 		target <- paste(n, string_name)
-		index2 <- which(grepl(target, bets_by_cat$TOTAL$Bet_Type[index]))
+		target2 <- paste(n, string_name2)
+
+		index2 <- which(grepl(target, bets_by_cat$TOTAL$Bet_Type[index]) | grepl(target2, bets_by_cat$TOTAL$Bet_Type[index]))
 
 		bets_DB$TOTAL[[length(bets_DB$TOTAL) + 1]] <- bets_by_cat$TOTAL[index[index2], names(bets_by_cat$TOTAL), with = FALSE]
 		rmv <- c(rmv, index2)
@@ -294,6 +316,8 @@ process_MiseOjeu_data <- function(path){
 
 		target <- paste(n, string_name)
 		index <- which(grepl(target, bets_by_cat$TOTAL$Bet_Type))
+
+		if(length(index) == 0){next}
 
 		bets_DB$TOTAL[[length(bets_DB$TOTAL) + 1]] <- bets_by_cat$TOTAL[index, names(bets_by_cat$TOTAL), with = FALSE]
 		bets_by_cat$TOTAL <- bets_by_cat$TOTAL[-index]
@@ -363,7 +387,16 @@ process_MiseOjeu_data <- function(path){
 
 	#-------------------------------------------------
 	#GAGNANT
-	innings <- c(100, 99, 9, 1, 3, 5, 7)
+	#innings <- c(100, 99, 9, 1, 3, 5, 7)
+
+	g <- function(x){
+
+		out <- stringr::str_extract_all(x,"\\(?[0-9,.]+\\)?")[[1]]
+		if(length(out) == 0){9} else {as.numeric(out)}
+
+	}
+
+	innings <- sapply(names(bets_DB$GAGNANT), g)
 	for(j in 1:length(innings)){
 
 		bets_DB$GAGNANT[[j]][, Inn. := eval(innings[j])]
@@ -377,7 +410,7 @@ process_MiseOjeu_data <- function(path){
 
 
 	#ECART
-	innings <- seq(from = 3, to = 9, by = 2)
+	innings <- sapply(names(bets_DB$ECART), g)
 	for(j in 1:length(innings)){
 
 		bets_DB$ECART[[j]][, Inn. := eval(innings[j])]
@@ -396,9 +429,12 @@ process_MiseOjeu_data <- function(path){
 						both = which(!grepl("PAIR", nm, fixed = TRUE) & !grepl("SINGLE", nm, fixed = TRUE)), 
 						single = which(grepl("SINGLE", nm, fixed = TRUE)))
 
-	innings <- list(odd_even = seq(from = 3, to = 9, by = 2),
-							both = seq(from = 1, to = 9, by = 2),
-							single = seq(from = 3, to = 9, by = 2))
+	innings <- lapply(indices, function(i){
+
+		sapply(nm[i], g)
+
+		})
+
 
 	bet_type <- c("ODD/EVEN", "SUM", "POINTS")
 
@@ -427,7 +463,7 @@ process_MiseOjeu_data <- function(path){
 	}
 
 	#MARGIN
-	innings <- seq(from = 3, to = 9, by = 2)
+	innings <- sapply(names(bets_DB$MARGE), g)
 	for(j in 1:length(innings)){
 
 		bets_DB$MARGE[[j]] <- bets_DB$MARGE[[j]][Bet_On2 != "None"]
