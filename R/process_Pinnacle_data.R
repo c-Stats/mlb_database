@@ -103,7 +103,7 @@ process_Pinnacle_data <- function(path){
 				gap <- which(diff(index) != 1) 
 				if(!any(gap)){next}
 
-				gap <- gap[1] + 1
+				gap <- gap[min(length(gap), 2)] + 1
 				index <- index[gap:length(index)]
 
 				bets[[length(bets)]][index, Inn. := 5]
