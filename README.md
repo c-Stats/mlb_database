@@ -38,7 +38,7 @@ mlbDatabase::process_Pinnacle_data(path)
 
 ``` 
 
-Lastly, once the data has been cleaned and the two previous function ran, one can identify the current arbitrage opportunities, as well as evaluate the past 
+Lastly, once the data has been cleaned and the two previous function ran, one can identify the current betting opportunities with positive expected returns, as well as evaluate the past 
 performance of the optimal betting portfolio (in terms of mean expected geometrical returns). The final file will be avaible at: "path/MLB_Modeling/Betting/Predicted_Lineups/Arbitrage.rds"
 
 
