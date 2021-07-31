@@ -40,7 +40,10 @@ process_Pinnacle_data <- function(path){
 	if(file.exists(path_check)){
 
 		temp <- readRDS(path_check)
-		dates_done <- unique(temp$GAGNANT$moneyline$Date)
+		dates_done <- sort(unique(temp$GAGNANT$moneyline$Date))
+
+		max_n <- max(1, length(dates_done) - 10)
+		dates_done <- max_n[1:max_n]
 
 		today <- Sys.Date()
 		dates_done <- dates_done[dates_done < today]
