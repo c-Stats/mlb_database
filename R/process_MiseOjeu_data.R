@@ -42,6 +42,9 @@ process_MiseOjeu_data <- function(path){
 		temp <- readRDS(path_check)
 		dates_done <- unique(temp$Date)
 
+		max_n <- max(1, length(dates_done) - 10)
+		dates_done <- max_n[1:max_n]
+
 		today <- Sys.Date()
 		dates_done <- dates_done[dates_done < today]
 
@@ -57,7 +60,8 @@ process_MiseOjeu_data <- function(path){
 
 		#Skip if already processed 
 		date <- as.Date(rev(stringr::str_split(f_path, "/")[[1]])[1], "%d-%m-%Y")
-		if(date %in% dates_done | date < "2021-06-22"){
+		#if(date %in% dates_done | date < "2021-06-22"){
+		if(date < "2021-06-22"){
 
 			next
 
@@ -71,6 +75,8 @@ process_MiseOjeu_data <- function(path){
 		bets[[length(bets)]][, Scrapping_Time := as.POSIXct(Scrapping_Time)]
 		bets[[length(bets)]][, Game_Time := as.POSIXct(Game_Time)]
 		bets[[length(bets)]][, Date := as.Date(stringr::str_split(Game_Time, " ", simplify = TRUE)[, 1])]
+
+		bets[[length(bets)]] <- bets[[length(bets)]][Date == min(Date)]
 
 		#Fix gametime
 		fix <- as.numeric(strftime(bets[[length(bets)]]$Game_Time, format="%H")) < 12
@@ -505,12 +511,12 @@ process_MiseOjeu_data <- function(path){
 
 		temp <- data.table::copy(unique(rbind(temp, bets_DB)))
 
-		#temp[, Most_Recent := lapply(.SD, function(x){x == min(x)}),
-								#by = c("Team_Home", "Team_Away", "Date"),
-								#.SDcols = "Minutes_Until_Start"]
+		temp[, Most_Recent := lapply(.SD, function(x){x == max(x)}),
+								by = c("Team_Home", "Team_Away", "Date"),
+								.SDcols = "Scrapping_Time"]
 
-		#temp <- temp[Most_Recent == TRUE]
-		#temp[, Most_Recent := NULL]
+		temp <- temp[Most_Recent == TRUE]
+		temp[, Most_Recent := NULL]
 
 		saveRDS(temp, paste(folder_directory, "/Betting_Database.rds", sep = ""))
 
